@@ -15,6 +15,7 @@ import { ChatToolbar } from './ChatToolbar';
 import { extractImages, extractText, extractThinking, extractToolUse } from './message-utils';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import logoMark from '@/assets/logo-mark.svg';
 
 export function Chat() {
   const { t } = useTranslation('chat');
@@ -195,7 +196,13 @@ export function Chat() {
 function WelcomeScreen() {
   return (
     <div className="flex flex-col items-center justify-center text-center h-[60vh]">
-      <h1 className="text-6xl md:text-7xl font-serif text-foreground mb-3 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+      <img
+        src={logoMark}
+        alt="Item"
+        className="h-20 w-20 mb-6 opacity-60 dark:opacity-50"
+        draggable={false}
+      />
+      <h1 className="text-2xl font-bold text-foreground mb-2 tracking-tight">
         Welcome
       </h1>
       <p className="text-[17px] text-foreground/80 mb-8 font-medium">

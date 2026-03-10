@@ -33,9 +33,10 @@ import { trackUiEvent } from '@/lib/telemetry';
 import { toast } from 'sonner';
 import type { Skill } from '@/types/skill';
 import { useTranslation } from 'react-i18next';
+import { UnisTicketDialog } from '@/components/skills/UnisTicketDialog';
+import { UnisTicketIcon } from '@/components/skills/UnisTicketIcon';
 
-
-
+const UNIS_TICKET_SKILL_ID = 'unis-ticket';
 
 // Skill detail dialog component
 interface SkillDetailDialogProps {
@@ -172,7 +173,7 @@ function SkillDetailDialog({ skill, isOpen, onClose, onToggle, onUninstall }: Sk
                 </div>
               )}
             </div>
-            <h2 className="text-[28px] font-serif text-foreground font-normal mb-3 text-center tracking-tight">
+            <h2 className="text-xl font-semibold text-foreground mb-3 text-center tracking-tight">
               {skill.name}
             </h2>
             <div className="flex items-center justify-center gap-2.5 mb-6 opacity-80">
@@ -294,7 +295,7 @@ function SkillDetailDialog({ skill, isOpen, onClose, onToggle, onUninstall }: Sk
                 onClick={handleSaveConfig}
                 className={cn(
                   "flex-1 h-[42px] text-[13px] rounded-full font-semibold shadow-sm border border-transparent transition-all",
-                  "bg-[#0a84ff] hover:bg-[#007aff] text-white"
+                  "bg-primary hover:bg-primary/90 text-primary-foreground"
                 )}
                 disabled={isSaving}
               >
@@ -348,6 +349,7 @@ export function Skills() {
   const [searchQuery, setSearchQuery] = useState('');
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
+  const [unisTicketOpen, setUnisTicketOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [selectedSource, setSelectedSource] = useState<'all' | 'built-in' | 'marketplace'>('all');
   const marketplaceDiscoveryAttemptedRef = useRef(false);
@@ -553,7 +555,7 @@ export function Skills() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-start justify-between mb-6 shrink-0 gap-4">
           <div>
-            <h1 className="text-5xl md:text-6xl font-serif text-foreground mb-3 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+            <h1 className="text-2xl font-bold text-foreground mb-2 tracking-tight">
               {t('title')}
             </h1>
             <p className="text-[17px] text-foreground/80 font-medium">
@@ -677,51 +679,100 @@ export function Skills() {
 
           <div className="flex flex-col gap-1">
             {activeTab === 'all' && (
-              filteredSkills.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                  <Puzzle className="h-10 w-10 mb-4 opacity-50" />
-                  <p>{searchQuery ? t('noSkillsSearch') : t('noSkillsAvailable')}</p>
-                </div>
-              ) : (
-                filteredSkills.map((skill) => (
-                  <div
-                    key={skill.id}
-                    className="group flex flex-row items-center justify-between py-3.5 px-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer border-b border-black/5 dark:border-white/5 last:border-0"
-                    onClick={() => setSelectedSkill(skill)}
-                  >
-                    <div className="flex items-start gap-4 flex-1 overflow-hidden pr-4">
-                      <div className="h-10 w-10 shrink-0 flex items-center justify-center text-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-xl overflow-hidden">
-                        {skill.icon || '🧩'}
-                      </div>
-                      <div className="flex flex-col overflow-hidden">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-[15px] font-semibold text-foreground truncate">{skill.name}</h3>
-                          {skill.isCore ? (
-                            <Lock className="h-3 w-3 text-muted-foreground" />
-                          ) : skill.isBundled ? (
-                            <Puzzle className="h-3 w-3 text-blue-500/70" />
-                          ) : null}
+              <>
+                {/* Pinned Unis Ticket row — always at the top */}
+                {(() => {
+                  const unisSkill = safeSkills.find(s => s.id === UNIS_TICKET_SKILL_ID);
+                  const isConnected = !!unisSkill?.config?.apiKey;
+                  const matchesSearch = !searchQuery || 'unis ticket'.includes(searchQuery.toLowerCase());
+                  if (!matchesSearch) return null;
+                  return (
+                    <div
+                      className="group flex flex-row items-center justify-between py-3.5 px-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer border-b border-black/5 dark:border-white/5"
+                      onClick={() => setUnisTicketOpen(true)}
+                    >
+                      <div className="flex items-start gap-4 flex-1 overflow-hidden pr-4">
+                        <div className="h-10 w-10 shrink-0 flex items-center justify-center bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-xl overflow-hidden">
+                          <UnisTicketIcon size={28} />
                         </div>
-                        <p className="text-[13.5px] text-muted-foreground line-clamp-1 pr-6 leading-relaxed">
-                          {skill.description}
-                        </p>
+                        <div className="flex flex-col overflow-hidden">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="text-[15px] font-semibold text-foreground truncate">Unis Ticket</h3>
+                            {isConnected && (
+                              <Badge variant="secondary" className="text-[10px] font-medium px-2 py-0 h-5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 border-0 shadow-none">
+                                Connected
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-[13.5px] text-muted-foreground line-clamp-1 pr-6 leading-relaxed">
+                            Query, search, and manage tickets in Unis Ticket via your AI agent.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6 shrink-0" onClick={e => e.stopPropagation()}>
+                        <Switch
+                          checked={unisSkill?.enabled ?? false}
+                          onCheckedChange={(checked) => {
+                            if (unisSkill) {
+                              handleToggle(unisSkill.id, checked);
+                            } else if (checked) {
+                              setUnisTicketOpen(true);
+                            }
+                          }}
+                        />
                       </div>
                     </div>
-                    <div className="flex items-center gap-6 shrink-0" onClick={e => e.stopPropagation()}>
-                      {skill.version && (
-                        <span className="text-[13px] font-mono text-muted-foreground">
-                          v{skill.version}
-                        </span>
-                      )}
-                      <Switch
-                        checked={skill.enabled}
-                        onCheckedChange={(checked) => handleToggle(skill.id, checked)}
-                        disabled={skill.isCore}
-                      />
-                    </div>
+                  );
+                })()}
+
+                {filteredSkills.length === 0 && !safeSkills.find(s => s.id === UNIS_TICKET_SKILL_ID) ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                    <Puzzle className="h-10 w-10 mb-4 opacity-50" />
+                    <p>{searchQuery ? t('noSkillsSearch') : t('noSkillsAvailable')}</p>
                   </div>
-                ))
-              )
+                ) : (
+                  filteredSkills
+                    .filter(skill => skill.id !== UNIS_TICKET_SKILL_ID)
+                    .map((skill) => (
+                      <div
+                        key={skill.id}
+                        className="group flex flex-row items-center justify-between py-3.5 px-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer border-b border-black/5 dark:border-white/5 last:border-0"
+                        onClick={() => setSelectedSkill(skill)}
+                      >
+                        <div className="flex items-start gap-4 flex-1 overflow-hidden pr-4">
+                          <div className="h-10 w-10 shrink-0 flex items-center justify-center text-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-xl overflow-hidden">
+                            {skill.icon || '🧩'}
+                          </div>
+                          <div className="flex flex-col overflow-hidden">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-[15px] font-semibold text-foreground truncate">{skill.name}</h3>
+                              {skill.isCore ? (
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                              ) : skill.isBundled ? (
+                                <Puzzle className="h-3 w-3 text-blue-500/70" />
+                              ) : null}
+                            </div>
+                            <p className="text-[13.5px] text-muted-foreground line-clamp-1 pr-6 leading-relaxed">
+                              {skill.description}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6 shrink-0" onClick={e => e.stopPropagation()}>
+                          {skill.version && (
+                            <span className="text-[13px] font-mono text-muted-foreground">
+                              v{skill.version}
+                            </span>
+                          )}
+                          <Switch
+                            checked={skill.enabled}
+                            onCheckedChange={(checked) => handleToggle(skill.id, checked)}
+                            disabled={skill.isCore}
+                          />
+                        </div>
+                      </div>
+                    ))
+                )}
+              </>
             )}
 
             {activeTab === 'marketplace' && (
@@ -827,6 +878,24 @@ export function Skills() {
           setSelectedSkill({ ...selectedSkill, enabled });
         }}
         onUninstall={handleUninstall}
+      />
+
+      {/* Unis Ticket Dialog */}
+      <UnisTicketDialog
+        skill={safeSkills.find(s => s.id === UNIS_TICKET_SKILL_ID) ?? {
+          id: UNIS_TICKET_SKILL_ID,
+          name: 'Unis Ticket',
+          description: 'Query, search, and manage tickets in Unis Ticket via your AI agent.',
+          enabled: false,
+        }}
+        isOpen={unisTicketOpen}
+        onClose={() => setUnisTicketOpen(false)}
+        onToggle={(enabled) => {
+          const unisSkill = safeSkills.find(s => s.id === UNIS_TICKET_SKILL_ID);
+          if (unisSkill) {
+            handleToggle(unisSkill.id, enabled);
+          }
+        }}
       />
     </div>
   );

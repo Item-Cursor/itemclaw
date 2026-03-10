@@ -67,8 +67,7 @@ export function Agents() {
         <div className="flex flex-col md:flex-row md:items-start justify-between mb-12 shrink-0 gap-4">
           <div>
             <h1
-              className="text-5xl md:text-6xl font-serif text-foreground mb-3 font-normal tracking-tight"
-              style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}
+              className="text-2xl font-bold text-foreground mb-2 tracking-tight"
             >
               {t('title')}
             </h1>

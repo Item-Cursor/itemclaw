@@ -13,9 +13,9 @@
             "sharp"
         ]
     },
-    "description": "ClawX - Graphical AI Assistant based on OpenClaw",
+    "description": "ItemClaw - AI Assistant based on OpenClaw",
     "main": "dist-electron/main/index.js",
-    "author": "ClawX Team",
+    "author": "ItemClaw Team",
     "license": "MIT",
     "private": true,
     "scripts": {

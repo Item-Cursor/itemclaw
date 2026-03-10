@@ -29,11 +29,11 @@ async function ensureDir(dir: string): Promise<void> {
 // ── Pure helpers (no I/O) ────────────────────────────────────────
 
 /**
- * Merge a ClawX context section into an existing file's content.
+ * Merge a ItemClaw context section into an existing file's content.
  * If markers already exist, replaces the section in-place.
  * Otherwise appends it at the end.
  */
-export function mergeClawXSection(existing: string, section: string): string {
+export function mergeItemClawSection(existing: string, section: string): string {
   const wrapped = `${CLAWX_BEGIN}\n${section.trim()}\n${CLAWX_END}`;
   const beginIdx = existing.indexOf(CLAWX_BEGIN);
   const endIdx = existing.indexOf(CLAWX_END);
@@ -99,10 +99,10 @@ async function resolveAllWorkspaceDirs(): Promise<string[]> {
 // ── Bootstrap file repair ────────────────────────────────────────
 
 /**
- * Detect and remove bootstrap .md files that contain only ClawX markers
+ * Detect and remove bootstrap .md files that contain only ItemClaw markers
  * with no meaningful OpenClaw content outside them.
  */
-export async function repairClawXOnlyBootstrapFiles(): Promise<void> {
+export async function repairItemClawOnlyBootstrapFiles(): Promise<void> {
   const workspaceDirs = await resolveAllWorkspaceDirs();
   for (const workspaceDir of workspaceDirs) {
     if (!(await fileExists(workspaceDir))) continue;
@@ -131,9 +131,9 @@ export async function repairClawXOnlyBootstrapFiles(): Promise<void> {
       if (before === '' && after === '') {
         try {
           await unlink(filePath);
-          logger.info(`Removed ClawX-only bootstrap file for re-seeding: ${file} (${workspaceDir})`);
+          logger.info(`Removed ItemClaw-only bootstrap file for re-seeding: ${file} (${workspaceDir})`);
         } catch {
-          logger.warn(`Failed to remove ClawX-only bootstrap file: ${filePath}`);
+          logger.warn(`Failed to remove ItemClaw-only bootstrap file: ${filePath}`);
         }
       }
     }
@@ -143,14 +143,14 @@ export async function repairClawXOnlyBootstrapFiles(): Promise<void> {
 // ── Context merging ──────────────────────────────────────────────
 
 /**
- * Merge ClawX context snippets into workspace bootstrap files that
+ * Merge ItemClaw context snippets into workspace bootstrap files that
  * already exist on disk.  Returns the number of target files that were
  * skipped because they don't exist yet.
  */
-async function mergeClawXContextOnce(): Promise<number> {
+async function mergeItemClawContextOnce(): Promise<number> {
   const contextDir = join(getResourcesDir(), 'context');
   if (!(await fileExists(contextDir))) {
-    logger.debug('ClawX context directory not found, skipping context merge');
+    logger.debug('ItemClaw context directory not found, skipping context merge');
     return 0;
   }
 
@@ -180,10 +180,10 @@ async function mergeClawXContextOnce(): Promise<number> {
       const section = await readFile(join(contextDir, file), 'utf-8');
       const existing = await readFile(targetPath, 'utf-8');
 
-      const merged = mergeClawXSection(existing, section);
+      const merged = mergeItemClawSection(existing, section);
       if (merged !== existing) {
         await writeFile(targetPath, merged, 'utf-8');
-        logger.info(`Merged ClawX context into ${targetName} (${workspaceDir})`);
+        logger.info(`Merged ItemClaw context into ${targetName} (${workspaceDir})`);
       }
     }
   }
@@ -195,22 +195,22 @@ const RETRY_INTERVAL_MS = 2000;
 const MAX_RETRIES = 15;
 
 /**
- * Ensure ClawX context snippets are merged into the openclaw workspace
+ * Ensure ItemClaw context snippets are merged into the openclaw workspace
  * bootstrap files.
  */
-export async function ensureClawXContext(): Promise<void> {
-  let skipped = await mergeClawXContextOnce();
+export async function ensureItemClawContext(): Promise<void> {
+  let skipped = await mergeItemClawContextOnce();
   if (skipped === 0) return;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     await new Promise((r) => setTimeout(r, RETRY_INTERVAL_MS));
-    skipped = await mergeClawXContextOnce();
+    skipped = await mergeItemClawContextOnce();
     if (skipped === 0) {
-      logger.info(`ClawX context merge completed after ${attempt} retry(ies)`);
+      logger.info(`ItemClaw context merge completed after ${attempt} retry(ies)`);
       return;
     }
-    logger.debug(`ClawX context merge: ${skipped} file(s) still missing (retry ${attempt}/${MAX_RETRIES})`);
+    logger.debug(`ItemClaw context merge: ${skipped} file(s) still missing (retry ${attempt}/${MAX_RETRIES})`);
   }
 
-  logger.warn(`ClawX context merge: ${skipped} file(s) still missing after ${MAX_RETRIES} retries`);
+  logger.warn(`ItemClaw context merge: ${skipped} file(s) still missing after ${MAX_RETRIES} retries`);
 }

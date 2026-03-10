@@ -100,7 +100,7 @@ export function Channels() {
       <div className="w-full max-w-5xl mx-auto flex flex-col h-full p-10 pt-16">
         <div className="flex flex-col md:flex-row md:items-start justify-between mb-12 shrink-0 gap-4">
           <div>
-            <h1 className="text-5xl md:text-6xl font-serif text-foreground mb-3 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+            <h1 className="text-2xl font-bold text-foreground mb-2 tracking-tight">
               {t('title')}
             </h1>
             <p className="text-[17px] text-foreground/80 font-medium">
@@ -142,7 +142,7 @@ export function Channels() {
 
           {safeChannels.length > 0 && (
             <div className="mb-12">
-              <h2 className="text-3xl font-serif text-foreground mb-6 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+              <h2 className="text-xl font-semibold text-foreground mb-6 tracking-tight">
                 {t('availableChannels')}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
@@ -162,7 +162,7 @@ export function Channels() {
           )}
 
           <div className="mb-8">
-            <h2 className="text-3xl font-serif text-foreground mb-6 font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+            <h2 className="text-xl font-semibold text-foreground mb-6 tracking-tight">
               {t('supportedChannels')}
             </h2>
 
