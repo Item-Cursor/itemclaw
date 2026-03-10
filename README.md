@@ -3,7 +3,6 @@
   <img src="src/assets/logo-vertical-fullcolor-blacktxt.svg" width="128" alt="Item Logo" />
 </p>
 
-<h1 align="center">Item</h1>
 
 <p align="center">
   <strong>The Desktop Interface for OpenClaw AI Agents</strong>
