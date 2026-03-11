@@ -18,7 +18,7 @@
         },
         "installing": {
             "title": "Setting Up",
-            "description": "Installing essential components"
+            "description": "Installing optional components"
         },
         "complete": {
             "title": "All Set!",
@@ -86,8 +86,8 @@
         "configureAnother": "Configure another channel"
     },
     "installing": {
-        "title": "Installing Essential Components",
-        "subtitle": "Setting up the tools needed to power your AI assistant",
+        "title": "Installing Components",
+        "subtitle": "These tools enhance your experience but are not required. You can skip this step and install them later from Settings.",
         "progress": "Progress",
         "status": {
             "pending": "Pending",
@@ -95,10 +95,11 @@
             "installed": "Installed",
             "failed": "Failed"
         },
-        "error": "Setup Error:",
+        "error": "Some components could not be installed:",
+        "errorHint": "This is OK — the app works without them. You can retry from Settings later.",
         "restart": "Try restarting the app",
         "wait": "This may take a few moments...",
-        "skip": "Skip this step"
+        "skip": "Skip and continue"
     },
     "complete": {
         "title": "Setup Complete!",

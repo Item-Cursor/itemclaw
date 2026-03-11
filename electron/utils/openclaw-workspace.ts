@@ -144,10 +144,11 @@ export async function repairItemClawOnlyBootstrapFiles(): Promise<void> {
 
 /**
  * Merge ItemClaw context snippets into workspace bootstrap files that
- * already exist on disk.  Returns the number of target files that were
- * skipped because they don't exist yet.
+ * already exist on disk.  If the Gateway is expected to have started
+ * (indicated by `seedIfMissing`), creates empty target files so the
+ * merge can proceed without waiting for the Gateway to seed them.
  */
-async function mergeItemClawContextOnce(): Promise<number> {
+async function mergeItemClawContextOnce(seedIfMissing = false): Promise<number> {
   const contextDir = join(getResourcesDir(), 'context');
   if (!(await fileExists(contextDir))) {
     logger.debug('ItemClaw context directory not found, skipping context merge');
@@ -172,9 +173,23 @@ async function mergeItemClawContextOnce(): Promise<number> {
       const targetPath = join(workspaceDir, targetName);
 
       if (!(await fileExists(targetPath))) {
-        logger.debug(`Skipping ${targetName} in ${workspaceDir} (file does not exist yet, will be seeded by gateway)`);
-        skipped++;
-        continue;
+        if (seedIfMissing) {
+          // Create an empty bootstrap file so the merge can proceed.
+          // The Gateway will overwrite with its own content later and
+          // the next merge cycle will re-apply the ItemClaw section.
+          try {
+            await writeFile(targetPath, '', 'utf-8');
+            logger.info(`Seeded empty ${targetName} in ${workspaceDir} (gateway did not create it)`);
+          } catch {
+            logger.warn(`Failed to seed ${targetName} in ${workspaceDir}`);
+            skipped++;
+            continue;
+          }
+        } else {
+          logger.debug(`Skipping ${targetName} in ${workspaceDir} (file does not exist yet, will be seeded by gateway)`);
+          skipped++;
+          continue;
+        }
       }
 
       const section = await readFile(join(contextDir, file), 'utf-8');
@@ -196,7 +211,9 @@ const MAX_RETRIES = 15;
 
 /**
  * Ensure ItemClaw context snippets are merged into the openclaw workspace
- * bootstrap files.
+ * bootstrap files.  Retries up to MAX_RETRIES times waiting for the Gateway
+ * to seed the target files.  On the final attempt, creates empty files so
+ * the merge always completes rather than silently giving up.
  */
 export async function ensureItemClawContext(): Promise<void> {
   let skipped = await mergeItemClawContextOnce();
@@ -204,9 +221,10 @@ export async function ensureItemClawContext(): Promise<void> {
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     await new Promise((r) => setTimeout(r, RETRY_INTERVAL_MS));
-    skipped = await mergeItemClawContextOnce();
+    const isLastAttempt = attempt === MAX_RETRIES;
+    skipped = await mergeItemClawContextOnce(isLastAttempt);
     if (skipped === 0) {
-      logger.info(`ItemClaw context merge completed after ${attempt} retry(ies)`);
+      logger.info(`ItemClaw context merge completed after ${attempt} retry(ies)${isLastAttempt ? ' (seeded missing files)' : ''}`);
       return;
     }
     logger.debug(`ItemClaw context merge: ${skipped} file(s) still missing (retry ${attempt}/${MAX_RETRIES})`);

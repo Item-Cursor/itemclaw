@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { useChatStore, type RawMessage } from '@/stores/chat';
 import { useGatewayStore } from '@/stores/gateway';
+import { useSkillsStore } from '@/stores/skills';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -151,7 +152,34 @@ export function Chat() {
 
               {/* Typing indicator when sending but no stream content yet */}
               {sending && !pendingFinal && !hasAnyStreamContent && (
-                <TypingIndicator />
+                function TypingIndicator() {
+                  const { t } = useTranslation('chat');
+                  const skills = useSkillsStore((s) => s.skills);
+                  const hasEnabledSkills = skills.some((s) => s.enabled && !s.isCore);
+
+                  return (
+                    <div className="flex gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <div className="bg-muted rounded-2xl px-4 py-3">
+                        {hasEnabledSkills ? (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                            <span>{t('typingIndicator.loadingSkills')}</span>
+                          </div>
+                        ) : (
+                          <div className="flex gap-1">
+                            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
               )}
             </>
           )}
@@ -194,6 +222,7 @@ export function Chat() {
 // ── Welcome Screen ──────────────────────────────────────────────
 
 function WelcomeScreen() {
+  const { t } = useTranslation('chat');
   return (
     <div className="flex flex-col items-center justify-center text-center h-[60vh]">
       <img
@@ -203,14 +232,17 @@ function WelcomeScreen() {
         draggable={false}
       />
       <h1 className="text-2xl font-bold text-foreground mb-2 tracking-tight">
-        Welcome
+        {t('welcome.title')}
       </h1>
-      <p className="text-[17px] text-foreground/80 mb-8 font-medium">
-        Your AI assistant is ready. Start a conversation below.
+      <p className="text-[17px] text-foreground/80 mb-4 font-medium">
+        {t('welcome.subtitle')}
+      </p>
+      <p className="text-sm text-muted-foreground mb-8 max-w-md leading-relaxed">
+        {t('welcome.firstTimeHint')}
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-lg w-full">
-        {['Ask Questions', 'Creative Tasks', 'Brainstorming'].map((label, i) => (
+        {[t('welcome.askQuestions'), t('welcome.creativeTasks'), t('welcome.brainstorming')].map((label, i) => (
           <button 
             key={i} 
             className="px-4 py-1.5 rounded-full border border-black/10 dark:border-white/10 text-[13px] font-medium text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5 transition-colors bg-black/[0.02]"
@@ -226,17 +258,28 @@ function WelcomeScreen() {
 // ── Typing Indicator ────────────────────────────────────────────
 
 function TypingIndicator() {
+  const { t } = useTranslation('chat');
+  const skills = useSkillsStore((s) => s.skills);
+  const hasEnabledSkills = skills.some((s) => s.enabled && !s.isCore);
+
   return (
     <div className="flex gap-3">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
         <Sparkles className="h-4 w-4" />
       </div>
       <div className="bg-muted rounded-2xl px-4 py-3">
-        <div className="flex gap-1">
-          <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-          <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-          <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-        </div>
+        {hasEnabledSkills ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            <span>{t('typingIndicator.loadingSkills')}</span>
+          </div>
+        ) : (
+          <div className="flex gap-1">
+            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        )}
       </div>
     </div>
   );

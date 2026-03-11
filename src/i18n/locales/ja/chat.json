@@ -2,12 +2,12 @@
     "gatewayNotRunning": "ゲートウェイが停止中",
     "gatewayRequired": "チャットを使用するには OpenClaw ゲートウェイが実行されている必要があります。自動的に起動するか、設定から起動できます。",
     "welcome": {
-        "title": "ItemClaw チャット",
+        "title": "ItemClaw へようこそ",
         "subtitle": "AI アシスタントの準備ができました。下の入力欄から会話を始めましょう。",
+        "firstTimeHint": "チケットシステムを使用するには、スキルページで Unis Ticket スキルが有効になっていて、トークンが設定されていることを確認してください。初回の応答はスキルの読み込みに少し時間がかかる場合があります。",
         "askQuestions": "質問する",
-        "askQuestionsDesc": "あらゆるトピックについて回答を得る",
         "creativeTasks": "クリエイティブタスク",
-        "creativeTasksDesc": "ライティング、ブレスト、アイデア"
+        "brainstorming": "ブレインストーミング"
     },
     "noLogs": "（ログはまだありません）",
     "toolbar": {
@@ -22,5 +22,8 @@
         "withinTwoWeeks": "2週間以内",
         "withinMonth": "1か月以内",
         "older": "1か月より前"
+    },
+    "typingIndicator": {
+        "loadingSkills": "スキルを読み込み、回答を準備しています…"
     }
 }

@@ -2,12 +2,12 @@
     "gatewayNotRunning": "网关未运行",
     "gatewayRequired": "OpenClaw 网关需要运行才能使用聊天。它将自动启动，或者您可以从设置中启动。",
     "welcome": {
-        "title": "ItemClaw 聊天",
+        "title": "欢迎使用 ItemClaw",
         "subtitle": "您的 AI 助手已就绪。在下方开始对话。",
+        "firstTimeHint": "要使用工单系统，请确保在技能页面中启用了 Unis Ticket 技能并配置了令牌。首次响应可能需要一些时间来加载技能。",
         "askQuestions": "提问",
-        "askQuestionsDesc": "获取任何话题的答案",
         "creativeTasks": "创意任务",
-        "creativeTasksDesc": "写作、头脑风暴、创意"
+        "brainstorming": "头脑风暴"
     },
     "noLogs": "（暂无日志）",
     "toolbar": {
@@ -22,5 +22,8 @@
         "withinTwoWeeks": "两周内",
         "withinMonth": "一个月内",
         "older": "一个月之前"
+    },
+    "typingIndicator": {
+        "loadingSkills": "正在加载技能并生成回复…"
     }
 }

@@ -155,13 +155,25 @@ const CUSTOM_BUNDLED_SKILLS = [
 ] as const;
 
 /**
+ * Skills that should be enabled by default on fresh installs.
+ * All other skills will be disabled until the user explicitly enables them.
+ */
+const DEFAULT_ENABLED_SKILLS = new Set([
+    'unis-ticket',
+    'obsidian',
+    '1password',
+]);
+
+/**
  * Ensure built-in skills are deployed to ~/.openclaw/skills/<slug>/.
  * Skips any skill that already has a SKILL.md present (idempotent).
+ * On fresh installs, disables all skills except those in DEFAULT_ENABLED_SKILLS.
  * Runs at app startup; all errors are logged and swallowed so they never
  * block the normal startup flow.
  */
 export async function ensureBuiltinSkillsInstalled(): Promise<void> {
     const skillsRoot = join(homedir(), '.openclaw', 'skills');
+    const newlyInstalled: string[] = [];
 
     // Deploy openclaw extension skills
     for (const { slug, sourceExtension } of BUILTIN_SKILLS) {
@@ -184,6 +196,7 @@ export async function ensureBuiltinSkillsInstalled(): Promise<void> {
             await mkdir(targetDir, { recursive: true });
             await cp(sourceDir, targetDir, { recursive: true });
             logger.info(`Installed built-in skill: ${slug} -> ${targetDir}`);
+            newlyInstalled.push(slug);
         } catch (error) {
             logger.warn(`Failed to install built-in skill ${slug}:`, error);
         }
@@ -210,8 +223,45 @@ export async function ensureBuiltinSkillsInstalled(): Promise<void> {
             await mkdir(targetDir, { recursive: true });
             await cp(sourceDir, targetDir, { recursive: true });
             logger.info(`Installed custom bundled skill: ${slug} -> ${targetDir}`);
+            newlyInstalled.push(slug);
         } catch (error) {
             logger.warn(`Failed to install custom bundled skill ${slug}:`, error);
         }
+    }
+
+    // Set default enabled/disabled state for newly installed skills
+    if (newlyInstalled.length > 0) {
+        await applyDefaultSkillStates(newlyInstalled);
+    }
+}
+
+/**
+ * Write default enabled/disabled state into openclaw.json for newly installed skills.
+ * Skills not in DEFAULT_ENABLED_SKILLS are disabled by default.
+ */
+async function applyDefaultSkillStates(slugs: string[]): Promise<void> {
+    try {
+        const config = await readConfig();
+        if (!config.skills) config.skills = {};
+        if (!config.skills.entries) config.skills.entries = {};
+
+        let changed = false;
+        for (const slug of slugs) {
+            // Only set default if no entry exists yet (don't override user preference)
+            if (!config.skills.entries[slug]) {
+                const shouldEnable = DEFAULT_ENABLED_SKILLS.has(slug);
+                config.skills.entries[slug] = { enabled: shouldEnable };
+                if (!shouldEnable) {
+                    logger.info(`Disabled skill by default: ${slug}`);
+                }
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            await writeConfig(config);
+        }
+    } catch (error) {
+        logger.warn('Failed to apply default skill states:', error);
     }
 }

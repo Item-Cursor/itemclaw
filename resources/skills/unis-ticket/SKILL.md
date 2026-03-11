@@ -330,6 +330,7 @@ Used in `displayStatusSystemStatus` filter arrays:
 
 ## Tips
 
+- **First interaction**: When the user sends their first ticket-related question in a session, immediately reply with a brief acknowledgment (e.g., "Let me check the ticket system for you — this may take a moment while I connect and fetch the data.") before making any API calls. This sets expectations for the initial delay caused by authentication and first API round-trip.
 - **"How many tickets do I have?"** — call `/v1/staff/auth/current` to get the staffId, then POST `/v1/staff/tickets/page` with `{"page": 1, "size": 1, "input": {"staffId": <id>}}` and read the `total` field.
 - **"Show my open tickets"** — filter with `{"staffId": <id>, "displayStatusSystemStatus": [10]}`.
 - **"Show overdue tickets"** — filter with `{"staffId": <id>, "ticketIsOverdue": true}`.

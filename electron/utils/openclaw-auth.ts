@@ -955,6 +955,26 @@ export async function sanitizeOpenClawConfig(): Promise<void> {
     console.log('[sanitize] Enabling commands.restart for graceful reload support');
   }
 
+  // ── agents.defaults cleanup ────────────────────────────────────
+  // OpenClaw's Zod schema uses .strict() on agents.defaults, so unrecognized
+  // keys cause a fatal validation error. Remove any that slipped in.
+  const agentsCfg = config.agents;
+  if (agentsCfg && typeof agentsCfg === 'object' && !Array.isArray(agentsCfg)) {
+    const agentsObj = agentsCfg as Record<string, unknown>;
+    const defaultsCfg = agentsObj.defaults;
+    if (defaultsCfg && typeof defaultsCfg === 'object' && !Array.isArray(defaultsCfg)) {
+      const defaultsObj = defaultsCfg as Record<string, unknown>;
+      const INVALID_DEFAULTS_KEYS = ['thinkingLevel'];
+      for (const key of INVALID_DEFAULTS_KEYS) {
+        if (key in defaultsObj) {
+          console.log(`[sanitize] Removing invalid key "agents.defaults.${key}" from openclaw.json`);
+          delete defaultsObj[key];
+          modified = true;
+        }
+      }
+    }
+  }
+
   // ── tools.web.search.kimi ─────────────────────────────────────
   // OpenClaw web_search(kimi) prioritizes tools.web.search.kimi.apiKey over
   // environment/auth-profiles. A stale inline key can cause persistent 401s.

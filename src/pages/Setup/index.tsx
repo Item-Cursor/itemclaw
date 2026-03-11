@@ -1265,14 +1265,14 @@ function ProviderContent({
           {/* Device OAuth Trigger */}
           {useOAuthFlow && (
             <div className="space-y-4 pt-2">
-              <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-4 text-center">
-                <p className="text-sm text-blue-200 mb-3 block">
+              <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-4 text-center">
+                <p className="text-sm text-purple-200 mb-3 block">
                   This provider requires signing in via your browser.
                 </p>
                 <Button
                   onClick={handleStartOAuth}
                   disabled={oauthFlowing}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                 >
                   {oauthFlowing ? (
                     <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Waiting...</>
@@ -1532,18 +1532,21 @@ function InstallingContent({ skills, onComplete, onSkip }: InstallingContentProp
         >
           <div className="flex items-start gap-2">
             <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p className="font-semibold">{t('installing.error')}</p>
               <pre className="text-xs bg-black/30 p-2 rounded overflow-x-auto whitespace-pre-wrap font-monospace">
                 {errorMessage}
               </pre>
-              <Button
-                variant="link"
-                className="text-red-400 p-0 h-auto text-xs underline"
-                onClick={() => window.location.reload()}
-              >
-                {t('installing.restart')}
-              </Button>
+              <p className="text-xs text-red-300/80">{t('installing.errorHint')}</p>
+              <div className="flex items-center gap-3 pt-1">
+                <Button
+                  variant="link"
+                  className="text-red-400 p-0 h-auto text-xs underline"
+                  onClick={() => window.location.reload()}
+                >
+                  {t('installing.restart')}
+                </Button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -1556,8 +1559,8 @@ function InstallingContent({ skills, onComplete, onSkip }: InstallingContentProp
       )}
       <div className="flex justify-end">
         <Button
-          variant="ghost"
-          className="text-muted-foreground"
+          variant={errorMessage ? 'default' : 'ghost'}
+          className={errorMessage ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'text-muted-foreground'}
           onClick={onSkip}
         >
           {t('installing.skip')}
