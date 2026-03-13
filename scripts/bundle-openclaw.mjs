@@ -17,7 +17,11 @@
  */
 
 import 'zx/globals';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import fs from 'node:fs';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT = path.join(ROOT, 'build', 'openclaw');
 const NODE_MODULES = path.join(ROOT, 'node_modules');
@@ -29,16 +33,45 @@ function normWin(p) {
   return '\\\\?\\' + p.replace(/\//g, '\\');
 }
 
+// On Windows, avoid reaching drive root (e.g. "C:" or "C:\") which can make fs throw EISDIR/lstat 'C:'.
+function isDriveRoot(dir) {
+  if (process.platform !== 'win32') return false;
+  const normalized = path.resolve(dir).replace(/\//g, path.sep);
+  return normalized.length <= 3 && /^[A-Za-z]:[\\/]?$/.test(normalized);
+}
+
+// Resolve to real path (follow symlinks). On Windows, never use fs.realpathSync (can throw EISDIR/lstat 'C:').
+function safeRealpathSync(p) {
+  const full = path.resolve(p);
+  if (process.platform === 'win32') {
+    let current = full;
+    for (;;) {
+      if (isDriveRoot(current)) return current;
+      try {
+        const stat = fs.lstatSync(current);
+        if (!stat.isSymbolicLink()) return current;
+        const target = fs.readlinkSync(current);
+        const next = path.resolve(path.dirname(current), target);
+        if (isDriveRoot(next) || next === current) return current;
+        current = next;
+      } catch {
+        return current;
+      }
+    }
+  }
+  return fs.realpathSync(full);
+}
+
 echo`📦 Bundling openclaw for electron-builder...`;
 
 // 1. Resolve the real path of node_modules/openclaw (follows pnpm symlink)
-const openclawLink = path.join(NODE_MODULES, 'openclaw');
+const openclawLink = path.resolve(ROOT, 'node_modules', 'openclaw');
 if (!fs.existsSync(openclawLink)) {
   echo`❌ node_modules/openclaw not found. Run pnpm install first.`;
   process.exit(1);
 }
 
-const openclawReal = fs.realpathSync(normWin(openclawLink));
+const openclawReal = safeRealpathSync(openclawLink);
 echo`   openclaw resolved: ${openclawReal}`;
 
 // 2. Clean and create output directory
@@ -152,7 +185,7 @@ while (queue.length > 0) {
 
     let realPath;
     try {
-      realPath = fs.realpathSync(normWin(fullPath));
+      realPath = safeRealpathSync(fullPath);
     } catch {
       continue; // broken symlink, skip
     }

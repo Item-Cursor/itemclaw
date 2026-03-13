@@ -102,7 +102,9 @@ dmg:
 win:
   forceCodeSigning: false
   verifyUpdateCodeSignature: false
-  signAndEditExecutable: true
+  # false: avoids downloading winCodeSign; on Windows the 7z extract creates darwin symlinks
+  # which require Admin or Developer Mode and fail with "privilege is not held"
+  signAndEditExecutable: false
   extraResources:
     - from: resources/bin/win32-${arch}
       to: bin
@@ -111,6 +113,10 @@ win:
   icon: resources/icons/icon.ico
   target:
     - target: nsis
+      arch:
+        - x64
+        - arm64
+    - target: msi
       arch:
         - x64
         - arm64
@@ -130,6 +136,12 @@ nsis:
   include: scripts/installer.nsh
   installerIcon: resources/icons/icon.ico
   uninstallerIcon: resources/icons/icon.ico
+
+msi:
+  oneClick: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ItemClaw
 
 # Linux Configuration
 linux:

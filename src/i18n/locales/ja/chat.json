@@ -4,7 +4,7 @@
     "welcome": {
         "title": "ItemClaw へようこそ",
         "subtitle": "AI アシスタントの準備ができました。下の入力欄から会話を始めましょう。",
-        "firstTimeHint": "チケットシステムを使用するには、スキルページで Unis Ticket スキルが有効になっていて、トークンが設定されていることを確認してください。初回の応答はスキルの読み込みに少し時間がかかる場合があります。",
+        "firstTimeHint": "チケット機能を使うには、スキルページで Unis Ticket スキルを有効にし、トークンを設定してください。",
         "askQuestions": "質問する",
         "creativeTasks": "クリエイティブタスク",
         "brainstorming": "ブレインストーミング"

@@ -34,6 +34,34 @@ function normWin(p) {
   return '\\\\?\\' + p.replace(/\//g, '\\');
 }
 
+// On Windows fs.realpathSync can throw EISDIR/lstat 'C:'. Follow symlinks manually instead.
+function isDriveRoot(dir) {
+  if (process.platform !== 'win32') return false;
+  const normalized = path.resolve(dir).replace(/\//g, path.sep);
+  return normalized.length <= 3 && /^[A-Za-z]:[\\/]?$/.test(normalized);
+}
+
+function safeRealpathSync(p) {
+  const full = path.resolve(p);
+  if (process.platform === 'win32') {
+    let current = full;
+    for (;;) {
+      if (isDriveRoot(current)) return current;
+      try {
+        const stat = fs.lstatSync(current);
+        if (!stat.isSymbolicLink()) return current;
+        const target = fs.readlinkSync(current);
+        const next = path.resolve(path.dirname(current), target);
+        if (isDriveRoot(next) || next === current) return current;
+        current = next;
+      } catch {
+        return current;
+      }
+    }
+  }
+  return fs.realpathSync(full);
+}
+
 const PLUGINS = [
   { npmName: '@soimy/dingtalk', pluginId: 'dingtalk' },
   { npmName: '@wecom/wecom-openclaw-plugin', pluginId: 'wecom' },
@@ -86,7 +114,7 @@ function bundleOnePlugin({ npmName, pluginId }) {
     throw new Error(`Missing dependency "${npmName}". Run pnpm install first.`);
   }
 
-  const realPluginPath = fs.realpathSync(normWin(pkgPath));
+  const realPluginPath = safeRealpathSync(pkgPath);
   const outputDir = path.join(OUTPUT_ROOT, pluginId);
 
   echo`📦 Bundling plugin ${npmName} -> ${outputDir}`;
@@ -126,7 +154,7 @@ function bundleOnePlugin({ npmName, pluginId }) {
 
       let realPath;
       try {
-        realPath = fs.realpathSync(normWin(fullPath));
+        realPath = safeRealpathSync(fullPath);
       } catch {
         continue;
       }

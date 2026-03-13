@@ -37,6 +37,8 @@ import { UnisTicketDialog } from '@/components/skills/UnisTicketDialog';
 import { UnisTicketIcon } from '@/components/skills/UnisTicketIcon';
 
 const UNIS_TICKET_SKILL_ID = 'unis-ticket';
+/** Display order for "all" tab: 1st = Unis Ticket (pinned), then this order, then rest. */
+const SKILL_DISPLAY_ORDER_AFTER_UNIS = ['1password', 'obsidian'];
 
 // Skill detail dialog component
 interface SkillDetailDialogProps {
@@ -396,6 +398,12 @@ export function Skills() {
 
     return matchesSearch && matchesSource;
   }).sort((a, b) => {
+    // Fixed display order after Unis Ticket (so e.g. 1password 2nd, obsidian 3rd)
+    const ai = SKILL_DISPLAY_ORDER_AFTER_UNIS.indexOf(a.id);
+    const bi = SKILL_DISPLAY_ORDER_AFTER_UNIS.indexOf(b.id);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
     // Enabled skills first
     if (a.enabled && !b.enabled) return -1;
     if (!a.enabled && b.enabled) return 1;

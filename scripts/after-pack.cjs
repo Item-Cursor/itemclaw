@@ -19,8 +19,8 @@
  *      @mariozechner/clipboard).
  */
 
-const { cpSync, existsSync, readdirSync, rmSync, statSync, mkdirSync, realpathSync } = require('fs');
-const { join, dirname, basename } = require('path');
+const { cpSync, existsSync, readdirSync, rmSync, statSync, mkdirSync, realpathSync, lstatSync, readlinkSync } = require('fs');
+const { join, dirname, basename, resolve } = require('path');
 
 // On Windows, paths in pnpm's virtual store can exceed the default MAX_PATH
 // limit (260 chars). Node.js 18.17+ respects the system LongPathsEnabled
@@ -30,6 +30,36 @@ function normWin(p) {
   if (process.platform !== 'win32') return p;
   if (p.startsWith('\\\\?\\')) return p;
   return '\\\\?\\' + p.replace(/\//g, '\\');
+}
+
+// On Windows realpathSync(normWin(...)) can throw EISDIR/lstat 'C:'.
+// Resolve symlinks manually so we get a real directory path for cpSync (avoids
+// "Cannot overwrite directory with non-directory" when source is a symlink).
+function isDriveRoot(dir) {
+  if (process.platform !== 'win32') return false;
+  const normalized = resolve(dir).replace(/\//g, require('path').sep);
+  return normalized.length <= 3 && /^[A-Za-z]:[\\/]?$/.test(normalized);
+}
+
+function safeRealpathSync(p) {
+  const full = resolve(p);
+  if (process.platform === 'win32') {
+    let current = full;
+    for (;;) {
+      if (isDriveRoot(current)) return current;
+      try {
+        const stat = lstatSync(current);
+        if (!stat.isSymbolicLink()) return current;
+        const target = readlinkSync(current);
+        const next = resolve(dirname(current), target);
+        if (isDriveRoot(next) || next === current) return current;
+        current = next;
+      } catch {
+        return current;
+      }
+    }
+  }
+  return realpathSync(full);
 }
 
 // ── Arch helpers ─────────────────────────────────────────────────────────────
@@ -221,12 +251,13 @@ function bundlePlugin(nodeModulesRoot, npmName, destDir) {
   }
 
   let realPluginPath;
-  try { realPluginPath = realpathSync(normWin(pkgPath)); } catch { realPluginPath = pkgPath; }
+  try { realPluginPath = safeRealpathSync(pkgPath); } catch { realPluginPath = pkgPath; }
 
-  // Copy plugin package itself
+  // Copy plugin package itself. Use normal paths for source so cpSync dereferences symlinks
+  // (on Windows, normWin(realPluginPath) can make cpSync treat a symlink as a file and fail).
   if (existsSync(normWin(destDir))) rmSync(normWin(destDir), { recursive: true, force: true });
   mkdirSync(normWin(destDir), { recursive: true });
-  cpSync(normWin(realPluginPath), normWin(destDir), { recursive: true, dereference: true });
+  cpSync(realPluginPath, normWin(destDir), { recursive: true, dereference: true });
 
   // Collect transitive deps via pnpm virtual store BFS
   const collected = new Map();
@@ -258,7 +289,7 @@ function bundlePlugin(nodeModulesRoot, npmName, destDir) {
       if (name === skipPkg) continue;
       if (SKIP_PACKAGES.has(name) || SKIP_SCOPES.some(s => name.startsWith(s))) continue;
       let rp;
-      try { rp = realpathSync(normWin(fullPath)); } catch { continue; }
+      try { rp = safeRealpathSync(fullPath); } catch { continue; }
       if (collected.has(rp)) continue;
       collected.set(rp, name);
       const depVirtualNM = getVirtualStoreNodeModules(rp);

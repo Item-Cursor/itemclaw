@@ -157,9 +157,12 @@ const CUSTOM_BUNDLED_SKILLS = [
 /**
  * Skills that should be enabled by default on fresh installs.
  * All other skills will be disabled until the user explicitly enables them.
+ *
+ * unis-ticket is intentionally NOT default-enabled: its SKILL.md is large
+ * (full API reference). Loading it on first chat slows the initial response.
+ * Users enable it in Skills when they need ticket features.
  */
 const DEFAULT_ENABLED_SKILLS = new Set([
-    'unis-ticket',
     'obsidian',
     '1password',
 ]);

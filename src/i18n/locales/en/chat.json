@@ -4,7 +4,7 @@
     "welcome": {
         "title": "Welcome to ItemClaw",
         "subtitle": "Your AI assistant is ready. Start a conversation below.",
-        "firstTimeHint": "To use the ticket system, make sure the Unis Ticket skill is enabled in Skills and your token is configured. First-time responses may take a moment while skills load.",
+        "firstTimeHint": "For ticket system features, enable the Unis Ticket skill in Skills and configure your token there.",
         "askQuestions": "Ask Questions",
         "creativeTasks": "Creative Tasks",
         "brainstorming": "Brainstorming"

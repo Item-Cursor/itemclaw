@@ -4,7 +4,7 @@
     "welcome": {
         "title": "欢迎使用 ItemClaw",
         "subtitle": "您的 AI 助手已就绪。在下方开始对话。",
-        "firstTimeHint": "要使用工单系统，请确保在技能页面中启用了 Unis Ticket 技能并配置了令牌。首次响应可能需要一些时间来加载技能。",
+        "firstTimeHint": "如需工单功能，请在技能页面启用 Unis Ticket 技能并配置令牌。",
         "askQuestions": "提问",
         "creativeTasks": "创意任务",
         "brainstorming": "头脑风暴"

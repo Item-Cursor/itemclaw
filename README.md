@@ -309,6 +309,34 @@ pnpm package:mac          # Package for macOS
 pnpm package:win          # Package for Windows
 pnpm package:linux        # Package for Linux
 ```
+
+#### Code signing (Windows)
+
+To avoid "Unknown Publisher" and SmartScreen warnings, sign the Windows build with a code signing certificate.
+
+1. **Obtain a certificate**
+   - **For public distribution**: Buy an **EV (Extended Validation)** or **OV (Organization Validation)** code signing certificate from a trusted CA (e.g. DigiCert, Sectigo, SSL.com). EV is recommended so SmartScreen builds reputation faster.
+   - **For internal/testing**: A self-signed certificate will not show a trusted publisher name for other users; use it only for testing or internal installs.
+
+2. **Export to PFX (if needed)**  
+   If the CA gave you a different format or the cert is in the Windows store, export it as a `.pfx` or `.p12` file (with private key and password).
+
+3. **Set environment variables** before building:
+   ```powershell
+   $env:CSC_LINK = "C:\path\to\your\certificate.pfx"
+   $env:CSC_KEY_PASSWORD = "your_certificate_password"
+   pnpm run package:win
+   ```
+   Or create a `.env` file (do not commit it) with:
+   ```
+   CSC_LINK=path/to/certificate.pfx
+   CSC_KEY_PASSWORD=your_certificate_password
+   ```
+   electron-builder reads these when packaging; if they are set, the executable and installer will be signed.
+
+4. **Rebuild**  
+   Run `pnpm run package:win` with the variables set. The installers under `release/` will be signed and will show your publisher name once the certificate is trusted by Windows.
+
 ### Tech Stack
 
 | Layer | Technology |
