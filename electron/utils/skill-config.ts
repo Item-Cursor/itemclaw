@@ -152,15 +152,15 @@ const BUILTIN_SKILLS = [
  */
 const CUSTOM_BUNDLED_SKILLS = [
     'unis-ticket',
+    'unis-ticket-reporting',
 ] as const;
 
 /**
  * Skills that should be enabled by default on fresh installs.
  * All other skills will be disabled until the user explicitly enables them.
  *
- * unis-ticket is intentionally NOT default-enabled: its SKILL.md is large
- * (full API reference). Loading it on first chat slows the initial response.
- * Users enable it in Skills when they need ticket features.
+ * unis-ticket and unis-ticket-reporting are intentionally NOT default-enabled:
+ * they are domain-specific and only needed for ticket workflows.
  */
 const DEFAULT_ENABLED_SKILLS = new Set([
     'obsidian',

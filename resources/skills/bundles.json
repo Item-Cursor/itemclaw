@@ -66,6 +66,8 @@
       "descriptionZh": "消息管理、语音通话、通知",
       "icon": "💬",
       "skills": [
+        "unis-ticket",
+        "unis-ticket-reporting",
         "discord",
         "slack",
         "voice-call",
