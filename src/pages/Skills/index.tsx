@@ -36,7 +36,19 @@ import { useTranslation } from 'react-i18next';
 import { UnisTicketDialog } from '@/components/skills/UnisTicketDialog';
 import { UnisTicketIcon } from '@/components/skills/UnisTicketIcon';
 
-const UNIS_TICKET_SKILL_ID = 'unis-ticket';
+const SPECIAL_UNIS_LOGIN_SKILLS = [
+  {
+    id: 'unis-ticket',
+    name: 'Unis Ticket',
+    description: 'Query, search, and manage tickets in Unis Ticket via your AI agent.',
+  },
+  {
+    id: 'unis-ticket-reporting',
+    name: 'Unis Ticket Reporting',
+    description: 'Generate daily UniTicket reporting summaries and action queues by department.',
+  },
+] as const;
+const UNIS_LOGIN_SKILL_IDS = SPECIAL_UNIS_LOGIN_SKILLS.map((s) => s.id);
 /** Display order for "all" tab: 1st = Unis Ticket (pinned), then this order, then rest. */
 const SKILL_DISPLAY_ORDER_AFTER_UNIS = ['1password', 'obsidian'];
 
@@ -351,7 +363,7 @@ export function Skills() {
   const [searchQuery, setSearchQuery] = useState('');
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
-  const [unisTicketOpen, setUnisTicketOpen] = useState(false);
+  const [unisLoginOpenSkillId, setUnisLoginOpenSkillId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [selectedSource, setSelectedSource] = useState<'all' | 'built-in' | 'marketplace'>('all');
   const marketplaceDiscoveryAttemptedRef = useRef(false);
@@ -413,6 +425,8 @@ export function Skills() {
     // Finally alphabetical
     return a.name.localeCompare(b.name);
   });
+  const visibleSpecialUnisSkills = filteredSkills.filter((skill) => UNIS_LOGIN_SKILL_IDS.includes(skill.id));
+  const genericFilteredSkills = filteredSkills.filter((skill) => !UNIS_LOGIN_SKILL_IDS.includes(skill.id));
 
   const sourceStats = {
     all: safeSkills.length,
@@ -688,16 +702,13 @@ export function Skills() {
           <div className="flex flex-col gap-1">
             {activeTab === 'all' && (
               <>
-                {/* Pinned Unis Ticket row — always at the top */}
-                {(() => {
-                  const unisSkill = safeSkills.find(s => s.id === UNIS_TICKET_SKILL_ID);
-                  const isConnected = !!unisSkill?.config?.apiKey;
-                  const matchesSearch = !searchQuery || 'unis ticket'.includes(searchQuery.toLowerCase());
-                  if (!matchesSearch) return null;
+                {visibleSpecialUnisSkills.map((skill) => {
+                  const isConnected = !!skill.config?.apiKey;
                   return (
                     <div
+                      key={skill.id}
                       className="group flex flex-row items-center justify-between py-3.5 px-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer border-b border-black/5 dark:border-white/5"
-                      onClick={() => setUnisTicketOpen(true)}
+                      onClick={() => setUnisLoginOpenSkillId(skill.id)}
                     >
                       <div className="flex items-start gap-4 flex-1 overflow-hidden pr-4">
                         <div className="h-10 w-10 shrink-0 flex items-center justify-center bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-xl overflow-hidden">
@@ -705,7 +716,7 @@ export function Skills() {
                         </div>
                         <div className="flex flex-col overflow-hidden">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-[15px] font-semibold text-foreground truncate">Unis Ticket</h3>
+                            <h3 className="text-[15px] font-semibold text-foreground truncate">{skill.name}</h3>
                             {isConnected && (
                               <Badge variant="secondary" className="text-[10px] font-medium px-2 py-0 h-5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 border-0 shadow-none">
                                 Connected
@@ -713,34 +724,27 @@ export function Skills() {
                             )}
                           </div>
                           <p className="text-[13.5px] text-muted-foreground line-clamp-1 pr-6 leading-relaxed">
-                            Query, search, and manage tickets in Unis Ticket via your AI agent.
+                            {skill.description}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-6 shrink-0" onClick={e => e.stopPropagation()}>
                         <Switch
-                          checked={unisSkill?.enabled ?? false}
-                          onCheckedChange={(checked) => {
-                            if (unisSkill) {
-                              handleToggle(unisSkill.id, checked);
-                            } else if (checked) {
-                              setUnisTicketOpen(true);
-                            }
-                          }}
+                          checked={skill.enabled}
+                          onCheckedChange={(checked) => handleToggle(skill.id, checked)}
                         />
                       </div>
                     </div>
                   );
-                })()}
+                })}
 
-                {filteredSkills.length === 0 && !safeSkills.find(s => s.id === UNIS_TICKET_SKILL_ID) ? (
+                {genericFilteredSkills.length === 0 && visibleSpecialUnisSkills.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                     <Puzzle className="h-10 w-10 mb-4 opacity-50" />
                     <p>{searchQuery ? t('noSkillsSearch') : t('noSkillsAvailable')}</p>
                   </div>
                 ) : (
-                  filteredSkills
-                    .filter(skill => skill.id !== UNIS_TICKET_SKILL_ID)
+                  genericFilteredSkills
                     .map((skill) => (
                       <div
                         key={skill.id}
@@ -890,19 +894,24 @@ export function Skills() {
 
       {/* Unis Ticket Dialog */}
       <UnisTicketDialog
-        skill={safeSkills.find(s => s.id === UNIS_TICKET_SKILL_ID) ?? {
-          id: UNIS_TICKET_SKILL_ID,
-          name: 'Unis Ticket',
-          description: 'Query, search, and manage tickets in Unis Ticket via your AI agent.',
-          enabled: false,
-        }}
-        isOpen={unisTicketOpen}
-        onClose={() => setUnisTicketOpen(false)}
+        skill={(() => {
+          if (!unisLoginOpenSkillId) return null;
+          const resolvedSkill = safeSkills.find(s => s.id === unisLoginOpenSkillId);
+          if (resolvedSkill) return resolvedSkill;
+          const fallback = SPECIAL_UNIS_LOGIN_SKILLS.find((s) => s.id === unisLoginOpenSkillId);
+          if (!fallback) return null;
+          return {
+            id: fallback.id,
+            name: fallback.name,
+            description: fallback.description,
+            enabled: false,
+          };
+        })()}
+        isOpen={!!unisLoginOpenSkillId}
+        onClose={() => setUnisLoginOpenSkillId(null)}
         onToggle={(enabled) => {
-          const unisSkill = safeSkills.find(s => s.id === UNIS_TICKET_SKILL_ID);
-          if (unisSkill) {
-            handleToggle(unisSkill.id, enabled);
-          }
+          if (!unisLoginOpenSkillId) return;
+          handleToggle(unisLoginOpenSkillId, enabled);
         }}
       />
     </div>

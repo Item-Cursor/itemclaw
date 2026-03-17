@@ -60,7 +60,7 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
       const result = await invokeIpc<{ success: boolean; error?: string }>(
         'skill:updateConfig',
         {
-          skillKey: 'unis-ticket',
+          skillKey: skill.id,
           apiKey: loginResult.token,
           env: {},
         },
@@ -77,7 +77,7 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
       await fetchSkills();
       setSuccess(true);
       setPassword('');
-      toast.success('Unis Ticket connected successfully');
+      toast.success(`${skill.name} connected successfully`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connection failed');
     } finally {
@@ -99,7 +99,7 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
               <UnisTicketIcon size={36} />
             </div>
             <h2 className="text-xl font-semibold text-foreground mb-3 text-center tracking-tight">
-              Unis Ticket
+              {skill.name}
             </h2>
             <div className="flex items-center justify-center gap-2.5 mb-6 opacity-80">
               <Badge variant="secondary" className="font-mono text-[11px] font-medium px-3 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.12] border-0 shadow-none text-foreground/70 transition-colors">
@@ -108,7 +108,7 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
             </div>
 
             <p className="text-[14px] text-foreground/70 font-medium leading-[1.6] text-center px-4">
-              Sign in with your Unis Ticket credentials so your AI agent can query, search, and manage tickets (e.g. "how many tickets do I have", "show my open tickets").
+              Sign in with your Unis Ticket credentials so your AI agent can access this skill and run ticket workflows.
             </p>
           </div>
 
