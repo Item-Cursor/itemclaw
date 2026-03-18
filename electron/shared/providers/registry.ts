@@ -30,7 +30,10 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
     category: 'official',
     envVar: 'OPENAI_API_KEY',
     defaultModelId: 'gpt-5.2',
-    supportedAuthModes: ['api_key'],
+    isOAuth: true,
+    supportsApiKey: true,
+    apiKeyUrl: 'https://platform.openai.com/api-keys',
+    supportedAuthModes: ['api_key', 'oauth_browser'],
     defaultAuthMode: 'api_key',
     supportsMultipleAccounts: true,
     providerConfig: {

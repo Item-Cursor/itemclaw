@@ -1,118 +1,234 @@
 ---
 name: unis-ticket-reporting
-description: Generate standardized daily UniTicket department reports with per-agent KPIs, executive summary, and prioritized action queue. Use when the user asks for ticket reporting, daily support metrics, SLA/overdue analysis, or department-level ticket summaries.
-metadata:
-  openclaw:
-    emoji: "📊"
-    requires:
-      bins: ["curl"]
-      env: ["UNIS_TICKET_TOKEN"]
-    primaryEnv: "UNIS_TICKET_TOKEN"
+description: Generate consistent UniTicket user/department reports from a minimal end-to-end flow. Use when user asks for daily ticket reports, KPI summaries, SLA/overdue analysis, action queues, or full ticket-number extraction for the authenticated user or a department.
 ---
 
-# UNIS Ticket Reporting - Core Execution Skill (v1.1)
+# UniTicket Reporting (Minimal Complete Flow)
 
-## 1) Execution Goal
-Standardize the generation of daily ticket reports for any specified department using the UniTicket API and local staff mapping.
+## Goal
 
-## 2) Agent Setup & Validation Checklist
-- [ ] Place mapping CSV in `data/reference/staff_department_20260228.csv`.
-- [ ] Set `UNIS_TICKET_API_KEY` and `UNIS_TICKET_USER_AGENT`.
-- [ ] Validate staff row exists for target username.
+Produce a consistent report by:
 
-## 2) Primary API Contract
-**Endpoint:** `POST https://unisticket.item.com/api/item-tickets/v1/iam/tickets/page`
-**Headers:**
-- `x-api-key: <UNIS_TICKET_API_KEY>`
-- `user-agent: <UNIS_TICKET_USER_AGENT>`
-**1. "My Tickets" (Open, Closed, All):**
- *   **Intent:** User asks for tickets assigned to them (e.g., "my open tickets," "tickets assigned to me").
- *   **Action:**
- 	1.  **Retrieve Staff ID:** First, attempt to retrieve the cached `staffId` for the current user. If not cached, call `GET /v1/staff/auth/current` to get the `id` from the `data` field and cache it for future use.
- 	2.  **Filter Request:** Construct a `POST /v1/staff/tickets/page` request with the following `input` parameters:
-     	*   `"staffId": <cached_staff_id>`
-     	*   For "open tickets": Add `"displayStatusSystemStatus": [10]` (System Status Code for 'open')
-     	*   For "closed tickets": Add `"displayStatusSystemStatus": [20]` (System Status Code for 'closed')
-     	*   For "all my tickets": No `displayStatusSystemStatus` filter.
- 	3.  **Pagination:** Use `size=10` or `20` initially, and inform the user if `total` is higher.
- 
-**2. Department-Specific Tickets (Open, Closed, All):**
- *   **Intent:** User asks for tickets within a specific department (e.g., "open tickets in support," "all CSR tickets").
- *   **Action:**
- 	1.  **Identify Department ID:** Determine the `departmentId` based on the user's query (e.g., "CSR Ticket Support" -> ID "4"). If unsure or if the department name is ambiguous, use `POST /v1/staff/departments/page` to list departments for user confirmation.
- 	2.  **Filter Request:** Construct a `POST /v1/staff/tickets/page` request with the following `input` parameters:
-     	*   `"departmentIds": ["<identified_department_id>"]`
-     	*   For "open tickets": Add `"displayStatusSystemStatus": [10]`
-     	*   For "closed tickets": Add `"displayStatusSystemStatus": [20]`
-     	*   For "all department tickets": No `displayStatusSystemStatus` filter.
- 	3.  **Pagination:** Use `size=10` or `20` initially, and inform the user if `total` is higher.
- 
-**3. Tickets by Time Range ("this week", "last month", custom ranges):**
- *   **Intent:** User asks for tickets created within a specific time frame.
- *   **Action:**
- 	1.  **Calculate Date Range:** Determine `createTimeStart` and `createTimeEnd` in `MM/dd/yyyy HH:mm:ss` format based on the user's request and the current date.
-     	*   *Example: "This week" (assuming today is Friday)*: `createTimeStart` = Monday 00:00:00, `createTimeEnd` = Friday 23:59:59.
- 	2.  **Filter Request:** Construct a `POST /v1/staff/tickets/page` request with the following `input` parameters:
-     	*   `"createTimeStart": "<calculated_start_date>"`
-     	*   `"createTimeEnd": "<calculated_end_date>"`
- 	3.  **Combine Filters:** This time range filter can be combined with `staffId` or `departmentIds` filters from rules 1 and 2.
- 	4.  **Pagination:** Use `size=10` or `20` initially, and inform the user if `total` is higher.
- 
-**4. Counting Tickets (any category):**
- *   **Intent:** User asks for the *number* of tickets (e.g., "how many open tickets," "count of tickets for department X").
- *   **Action:**
- 	1.  **Use `/tickets/page` with `size=1`:** Apply relevant filters (`staffId`, `departmentIds`, `displayStatusSystemStatus`, `createTimeStart`, `createTimeEnd`) to a `POST /v1/staff/tickets/page` request.
- 	2.  **Extract `total`:** Read the `total` field from the response `data` object. This efficiently provides the count without retrieving all ticket records.
- 
-**5. Brief Information for a Specific Ticket:**
- *   **Intent:** User asks for details about a single ticket by its ID or number, but not necessarily a full timeline or all messages.
- *   **Action:**
- 	1.  **By Ticket ID:** Call `GET /v1/staff/tickets/brief/{id}`.
- 	2.  **By Ticket Number:** Call `GET /v1/staff/tickets/number/{code}`.
- 	3.  **Summarize:** Present key fields like `ticketNumber`, `title`, `displayStatusName`, `staffName`, `customerName`. Only fetch full `GET /v1/staff/tickets/{id}` if more comprehensive details (e.g., full description, custom fields) are explicitly requested.
+1. Resolving **staffId** and **departmentIds** (memory first, API fallback)
+2. Pulling **all matching tickets** from the page endpoint
+3. Computing stable KPIs and a prioritized action queue
+4. Returning a clear, user-facing summary with ticket numbers
 
+---
 
-**Request Body Template:**
+## Required Auth / Headers
+
+Use:
+
+- `x-tickets-token: $env:UNIS_TICKET_TOKEN`
+- `User-Agent: ItemClaw-TicketSkill/1.0`
+- `Content-Type: application/json` (POST)
+- `x-tickets-timezone: America/Los_Angeles` (required on `/auth/current`)
+
+Base URL:
+
+- `https://unisticket.item.com/api/item-tickets/v1/staff`
+
+---
+
+## Step 1 — Resolve Identity Context (Memory First)
+
+### 1A) Try memory first
+
+If prior run data is available in memory/workspace, reuse:
+
+- `staffId`
+- `departmentIds`
+- `timezone`
+- Optional canonical scope (for example: `my tickets`, `department`)
+
+### 1B) Fallback to API when missing or uncertain
+
+Call:
+
+- `GET /auth/current`
+
+Extract and cache:
+
+- `data.id` → `staffId`
+- `data.departments[].id` → `departmentIds`
+- `data.timezone`
+- `data.name`, `data.username`, `data.email` (for report header)
+
+Rule:
+
+- If memory and API disagree, trust API and refresh cached values.
+
+---
+
+## Step 2 — Define Report Scope
+
+Support these standard scopes:
+
+### 2.1 My tickets (default)
+
+- Filter: `staffId`
+
+### 2.2 Department tickets
+
+- Filter: `departmentIds` (single or multiple)
+
+### 2.3 Status filter (optional)
+
+- Open: `displayStatusSystemStatus: [10]`
+- Closed: `displayStatusSystemStatus: [20]`
+- All: omit field
+
+### 2.4 Date range filter (optional)
+
+- `createTimeStart`, `createTimeEnd`
+- Format: `MM/dd/yyyy HH:mm:ss`
+
+---
+
+## Step 3 — Pull All Tickets via Page Endpoint
+
+Endpoint:
+
+- `POST /tickets/page`
+
+Pagination contract:
+
+- Start with `page=1`, `size=100`
+- Read `data.total`
+- Continue pages until collected count >= `total`
+
+Minimal request body template:
+
 ```json
 {
-  "size": 100,
   "page": 1,
+  "size": 100,
   "input": {
-    "staffId": 0, // Normalize numeric IDs to integer strings
-    "dateField": 1,
-    "createTimeStart": "MM/DD/YYYY 00:00:00",
-    "createTimeEnd": "MM/DD/YYYY 23:59:59",
-    "displayStatusSystemStatus": [10, 20]
+    "staffId": 354064922684817408,
+    "departmentIds": [4],
+    "displayStatusSystemStatus": [10, 20],
+    "createTimeStart": "03/17/2026 00:00:00",
+    "createTimeEnd": "03/17/2026 23:59:59"
   }
 }
-## Daily Run Procedure
+```
 
-1. Define report window (recommended: previous day in business timezone).
+Notes:
 
-2. For each staff ID:
+- Include only filters relevant to the requested scope.
+- If user asks for count only, use `size=1` and read `data.total`.
 
-   - Call page API with `size=100`, `page=1`.
+---
 
-   - Read `data.total` and fetch remaining pages until all records are collected.
+## Step 4 — Extract Ticket Numbers + Stable Metrics
 
-3. Compute per-agent KPIs:
+From full collected list:
 
-   - Total tickets
+### Required extraction
 
-   - Open (system status 10)
+- `ticketNumber` for every ticket (dedupe if needed)
 
-   - Closed (system status 20)
+### Required KPIs
 
-   - Overdue count (`isOverdue=true`)
+- `totalTickets`
+- `openTickets` (system status `10`)
+- `closedTickets` (system status `20`)
+- `overdueTickets` (`ticketIsOverdue == true` or `isOverdue == true`)
+- `slaBreachedTickets` (`isSlaBreached == true`)
 
-   - SLA breached count (`isSlaBreached=true`)
+### Required breakdowns
 
-   - Breakdown by `displayStatusName`
+- By `displayStatusName`
+- By `departmentName`
+- By `priorityName` (if present)
 
-4. Produce two outputs:
+### Action queue ordering (for consistency)
 
-   - **Executive summary** (counts and trends)
+Sort with highest priority first:
 
-   - **Action queue** (open/overdue/SLA-breached tickets first)
+1. SLA breached
+2. Overdue
+3. Open tickets
+4. Most recently updated first (`updateTime` desc)
 
-5. Deliver report to the team channel and archive JSON/CSV snapshot.
+Include at least:
+
+- `ticketNumber`
+- `title`
+- `displayStatusName`
+- `departmentName`
+- `priorityName`
+- `updateTime`
+- Overdue/SLA flags
+
+---
+
+## Step 5 — Deterministic Final Output Format (Required)
+
+When reporting **assigned tickets for the current authenticated user**, render this exact section structure and label order:
+
+```text
+Ticket KPIs (Assigned to current authenticated user)
+Total tickets: <number>
+Open tickets: <number>
+Closed tickets: <number>
+Overdue tickets: <number>
+SLA-breached tickets: <number>
+
+Breakdowns
+By status:
+- <statusName> (<count>)
+- <statusName> (<count>)
+By priority:
+- <priorityName> (<count>)
+- <priorityName> (<count>)
+By department:
+- <departmentName> (<count>)
+- <departmentName> (<count>)
+
+Action Queue (Open tickets prioritized)
+<one ticket per line>
+```
+
+Deterministic rendering rules:
+
+- Keep section names and line order exactly as written.
+- Print each KPI on its own line exactly as shown (never combine multiple KPI values on one line).
+- Always print all KPI lines, even when values are zero.
+- If no assigned tickets exist, use exact fallback text:
+  - `By status:`
+  - `- none (no assigned tickets)`
+  - `By priority:`
+  - `- none (no assigned tickets)`
+  - `By department:`
+  - `- none (no assigned tickets)`
+  - `No open tickets found for this user.`
+- If tickets exist, print each breakdown item on its own line under the correct heading (never inline multiple values on one line).
+
+Output rule:
+
+- Do **not** include a JSON payload in the user-facing response.
+
+---
+
+## Consistency Rules
+
+- Reuse the exact deterministic output block labels every run.
+- Reuse the same KPI names every run.
+- Reuse the same action-queue sort order every run.
+- Explicitly state when totals are zero; do not omit sections.
+- For zero-ticket cases, use the exact fallback phrases from Step 5.
+- If any endpoint fails, report what succeeded, what failed, and what can be retried.
+- Never fabricate IDs or ticket numbers.
+
+---
+
+## Minimal Execution Checklist
+
+- [ ] Resolve `staffId` / `departmentIds` from memory or `/auth/current`
+- [ ] Build filters for requested scope
+- [ ] Page through `/tickets/page` until all records are retrieved
+- [ ] Extract all `ticketNumber` values
+- [ ] Compute KPIs + breakdowns + prioritized action queue
+- [ ] Return only the deterministic human-readable report
