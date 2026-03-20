@@ -22,18 +22,26 @@ The `UNIS_TICKET_TOKEN` environment variable is injected automatically when conf
 
 For endpoints that expect IAM credential authorization, use `IAM_CLIENT_CREDENTIAL_TOKEN` with an `Authorization` header.
 
+### Shell variable syntax (critical)
+
+OpenClaw runs tool commands under **bash** (on Windows: Git Bash). Use **POSIX** `$VAR` in curl header lines—not PowerShell `$env:VAR`. The latter does not expand in bash and will send a wrong or empty `x-tickets-token`, which surfaces as **401 Unauthorized** from the API.
+
+- Correct (bash / Git Bash): `"x-tickets-token: $UNIS_TICKET_TOKEN"`
+- Wrong here: `"x-tickets-token: $env:UNIS_TICKET_TOKEN"`
+- If you run curl yourself in PowerShell: `-H "x-tickets-token: $env:UNIS_TICKET_TOKEN"`
+
 ### Token refresh + env sync
 
 - If authentication fails (401/403 or token-invalid response), stop and ask for a fresh sign-in in the ClawX Skills UI.
 - Re-authentication in ClawX refreshes the token and updates `UNIS_TICKET_TOKEN` for both `unis-ticket` and `unis-ticket-reporting`.
-- Always read the latest token from `$env:UNIS_TICKET_TOKEN` and do not hardcode cached token values.
+- Always read the latest token from the environment and do not hardcode cached token values.
 
-Always use:
+Always use (bash / agent shell):
 
 ```bash
-curl.exe -s -X <METHOD> "https://unisticket.item.com/api/item-tickets/v1/staff/..." \
-  -H "x-tickets-token: $env:UNIS_TICKET_TOKEN" \
-  -H "Authorization: Bearer $env:IAM_CLIENT_CREDENTIAL_TOKEN" \
+curl -s -X <METHOD> "https://unisticket.item.com/api/item-tickets/v1/staff/..." \
+  -H "x-tickets-token: $UNIS_TICKET_TOKEN" \
+  -H "Authorization: Bearer $IAM_CLIENT_CREDENTIAL_TOKEN" \
   -H "User-Agent: ItemClaw-TicketSkill/1.0" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json"
@@ -57,9 +65,9 @@ curl.exe -s -X <METHOD> "https://unisticket.item.com/api/item-tickets/v1/staff/.
 ## Ticket list example
 
 ```bash
-curl.exe -s -X POST "https://unisticket.item.com/api/item-tickets/v1/staff/tickets/page" \
-  -H "x-tickets-token: $env:UNIS_TICKET_TOKEN" \
-  -H "Authorization: Bearer $env:IAM_CLIENT_CREDENTIAL_TOKEN" \
+curl -s -X POST "https://unisticket.item.com/api/item-tickets/v1/staff/tickets/page" \
+  -H "x-tickets-token: $UNIS_TICKET_TOKEN" \
+  -H "Authorization: Bearer $IAM_CLIENT_CREDENTIAL_TOKEN" \
   -H "User-Agent: ItemClaw-TicketSkill/1.0" \
   -H "Content-Type: application/json" \
   -d '{"page": 1, "size": 20, "input": {"displayStatusSystemStatus": [10]}}'

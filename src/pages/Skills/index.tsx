@@ -48,7 +48,8 @@ const SPECIAL_UNIS_LOGIN_SKILLS = [
   {
     id: 'unis-ticket-reporting',
     name: 'Unis Ticket Reporting',
-    description: 'Generate daily UniTicket reporting summaries and action queues by department.',
+    description:
+      'Run daily KPI reports and prioritized action queues (assigned-to-me, all open, or department-scoped) via run-report.ps1.',
   },
 ] as const;
 const UNIS_LOGIN_SKILL_IDS = SPECIAL_UNIS_LOGIN_SKILLS.map((s) => s.id);
@@ -502,11 +503,13 @@ export function Skills() {
     if (!a.isCore && b.isCore) return 1;
     return a.name.localeCompare(b.name);
   });
-  const visibleSpecialUnisSkills = filteredSkills.filter((skill) => UNIS_LOGIN_SKILL_IDS.includes(skill.id));
-  const visibleSpecialJiraSkills = filteredSkills.filter((skill) => JIRA_SKILL_IDS.includes(skill.id));
-  const genericFilteredSkills = filteredSkills.filter((skill) => (
-    !UNIS_LOGIN_SKILL_IDS.includes(skill.id) && !JIRA_SKILL_IDS.includes(skill.id)
-  ));
+  const unisLoginIdSet = new Set<string>(UNIS_LOGIN_SKILL_IDS);
+  const jiraSkillIdSet = new Set<string>(JIRA_SKILL_IDS);
+  const visibleSpecialUnisSkills = filteredSkills.filter((skill) => unisLoginIdSet.has(skill.id));
+  const visibleSpecialJiraSkills = filteredSkills.filter((skill) => jiraSkillIdSet.has(skill.id));
+  const genericFilteredSkills = filteredSkills.filter(
+    (skill) => !unisLoginIdSet.has(skill.id) && !jiraSkillIdSet.has(skill.id),
+  );
 
   const sourceStats = {
     all: safeSkills.length,

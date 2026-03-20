@@ -179,7 +179,8 @@ export async function updateSkillConfig(
                 const envToken = updates.env?.[UNIS_TOKEN_ENV_KEY]?.trim();
                 const envIamToken = updates.env?.[UNIS_IAM_TOKEN_ENV_KEY]?.trim();
                 const apiKeyToken = updates.apiKey?.trim();
-                const token = envToken || envIamToken || apiKeyToken || '';
+                // Prefer explicit session/apiKey for x-tickets-token; only fall back to IAM if nothing else is present.
+                const token = envToken || apiKeyToken || envIamToken || '';
                 if (token) {
                     for (const unisSkillKey of UNIS_SKILL_KEYS) {
                         const unisEntry = config.skills.entries[unisSkillKey] || {};

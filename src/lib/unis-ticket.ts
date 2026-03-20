@@ -17,10 +17,14 @@ type LoginResponse = {
   iamClientCredentialToken?: string;
   data?: {
     token?: string;
+    accessToken?: string;
+    access_token?: string;
     iamClientCredentialToken?: string;
     iam_client_credential_token?: string;
     session?: {
       token?: string;
+      accessToken?: string;
+      access_token?: string;
       iamClientCredentialToken?: string;
       iam_client_credential_token?: string;
     };
@@ -69,7 +73,11 @@ export async function loginUnisTicket(
       };
     }
     const sessionToken = data.data?.session?.token
+      || data.data?.session?.accessToken
+      || data.data?.session?.access_token
       || data.data?.token
+      || data.data?.accessToken
+      || data.data?.access_token
       || data.token;
     const iamToken = data.data?.session?.iamClientCredentialToken
       || data.data?.session?.iam_client_credential_token
@@ -100,6 +108,8 @@ export async function validateUnisTicketSession(
         Accept: 'application/json',
         'User-Agent': USER_AGENT,
         'x-tickets-token': token,
+        // Align with other staff endpoints that expect a timezone context.
+        'x-tickets-timezone': 'America/Los_Angeles',
       },
     });
     const data = await parseJsonOrError(res);

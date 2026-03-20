@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { invokeIpc } from '@/lib/api-client';
-import { loginUnisTicket } from '@/lib/unis-ticket';
+import { loginUnisTicket, validateUnisTicketSession } from '@/lib/unis-ticket';
 import { useSkillsStore } from '@/stores/skills';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -63,6 +63,15 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
       const resolvedIamToken = loginResult.iamClientCredentialToken || loginResult.token;
       if (!resolvedSessionToken || !resolvedIamToken) {
         setError('Missing Unis Ticket session token');
+        return;
+      }
+
+      const validated = await validateUnisTicketSession(resolvedSessionToken);
+      if (!validated.ok) {
+        setError(
+          validated.error
+            ?? 'Session token was not accepted by Unis Ticket. The server response format may have changed—try again or report this.',
+        );
         return;
       }
 
