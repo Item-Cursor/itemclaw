@@ -41,21 +41,21 @@ export function getOpenClawSkillsDir(): string {
 }
 
 /**
- * Get ItemClaw config directory
+ * Get ClawX config directory
  */
-export function getItemClawConfigDir(): string {
+export function getClawXConfigDir(): string {
   return join(homedir(), '.clawx');
 }
 
 /**
- * Get ItemClaw logs directory
+ * Get ClawX logs directory
  */
 export function getLogsDir(): string {
   return join(app.getPath('userData'), 'logs');
 }
 
 /**
- * Get ItemClaw data directory
+ * Get ClawX data directory
  */
 export function getDataDir(): string {
   return app.getPath('userData');

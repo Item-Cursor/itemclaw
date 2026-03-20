@@ -4,12 +4,12 @@ import {
   providerConfigToAccount,
   saveProviderAccount,
 } from './provider-store';
-import { getItemClawProviderStore } from './store-instance';
+import { getClawXProviderStore } from './store-instance';
 
 const PROVIDER_STORE_SCHEMA_VERSION = 1;
 
 export async function ensureProviderStoreMigrated(): Promise<void> {
-  const store = await getItemClawProviderStore();
+  const store = await getClawXProviderStore();
   const schemaVersion = Number(store.get('schemaVersion') ?? 0);
 
   if (schemaVersion >= PROVIDER_STORE_SCHEMA_VERSION) {

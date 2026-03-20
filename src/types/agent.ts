@@ -6,6 +6,7 @@ export interface AgentSummary {
   inheritedModel: boolean;
   workspace: string;
   agentDir: string;
+  mainSessionKey: string;
   channelTypes: string[];
 }
 
@@ -14,4 +15,5 @@ export interface AgentsSnapshot {
   defaultAgentId: string;
   configuredChannelTypes: string[];
   channelOwners: Record<string, string>;
+  channelAccountOwners: Record<string, string>;
 }

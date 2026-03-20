@@ -97,6 +97,7 @@ import {
   type ProviderAccount,
   type ProviderType,
   type ProviderTypeInfo,
+  getProviderDocsUrl,
   getProviderIconUrl,
   resolveProviderApiKeyForSave,
   resolveProviderModelForSave,
@@ -113,6 +114,15 @@ import clawxIcon from '@/assets/logo.svg';
 
 // Use the shared provider registry for setup providers
 const providers = SETUP_PROVIDERS;
+
+function getProtocolBaseUrlPlaceholder(
+  apiProtocol: ProviderAccount['apiProtocol'],
+): string {
+  if (apiProtocol === 'anthropic-messages') {
+    return 'https://api.example.com/anthropic';
+  }
+  return 'https://api.example.com/v1';
+}
 
 // NOTE: Channel types moved to Settings > Channels page
 // NOTE: Skill bundles moved to Settings > Skills page - auto-install essential skills during setup
@@ -316,7 +326,7 @@ function WelcomeContent() {
   return (
     <div className="text-center space-y-4">
       <div className="mb-4 flex justify-center">
-        <img src={clawxIcon} alt="ItemClaw" className="h-16 w-16" />
+        <img src={clawxIcon} alt="ClawX" className="h-16 w-16" />
       </div>
       <h2 className="text-xl font-semibold">{t('welcome.title')}</h2>
       <p className="text-muted-foreground">
@@ -704,7 +714,7 @@ function ProviderContent({
   onApiKeyChange,
   onConfiguredChange,
 }: ProviderContentProps) {
-  const { t } = useTranslation(['setup', 'settings']);
+  const { t, i18n } = useTranslation(['setup', 'settings']);
   const devModeUnlocked = useSettingsStore((state) => state.devModeUnlocked);
   const [showKey, setShowKey] = useState(false);
   const [validating, setValidating] = useState(false);
@@ -712,6 +722,7 @@ function ProviderContent({
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState('');
   const [modelId, setModelId] = useState('');
+  const [apiProtocol, setApiProtocol] = useState<ProviderAccount['apiProtocol']>('openai-completions');
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
   const providerMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -720,23 +731,44 @@ function ProviderContent({
   // OAuth Flow State
   const [oauthFlowing, setOauthFlowing] = useState(false);
   const [oauthData, setOauthData] = useState<{
+    mode: 'device';
     verificationUri: string;
     userCode: string;
     expiresIn: number;
+  } | {
+    mode: 'manual';
+    authorizationUrl: string;
+    message?: string;
   } | null>(null);
+  const [manualCodeInput, setManualCodeInput] = useState('');
   const [oauthError, setOauthError] = useState<string | null>(null);
   const pendingOAuthRef = useRef<{ accountId: string; label: string } | null>(null);
 
   // Manage OAuth events
   useEffect(() => {
     const handleCode = (data: unknown) => {
-      setOauthData(data as { verificationUri: string; userCode: string; expiresIn: number });
+      const payload = data as Record<string, unknown>;
+      if (payload?.mode === 'manual') {
+        setOauthData({
+          mode: 'manual',
+          authorizationUrl: String(payload.authorizationUrl || ''),
+          message: typeof payload.message === 'string' ? payload.message : undefined,
+        });
+      } else {
+        setOauthData({
+          mode: 'device',
+          verificationUri: String(payload.verificationUri || ''),
+          userCode: String(payload.userCode || ''),
+          expiresIn: Number(payload.expiresIn || 300),
+        });
+      }
       setOauthError(null);
     };
 
     const handleSuccess = async (data: unknown) => {
       setOauthFlowing(false);
       setOauthData(null);
+      setManualCodeInput('');
       setKeyValid(true);
 
       const payload = (data as { accountId?: string } | undefined) || undefined;
@@ -796,6 +828,7 @@ function ProviderContent({
 
     setOauthFlowing(true);
     setOauthData(null);
+    setManualCodeInput('');
     setOauthError(null);
 
     try {
@@ -821,9 +854,24 @@ function ProviderContent({
   const handleCancelOAuth = async () => {
     setOauthFlowing(false);
     setOauthData(null);
+    setManualCodeInput('');
     setOauthError(null);
     pendingOAuthRef.current = null;
     await hostApiFetch('/api/providers/oauth/cancel', { method: 'POST' });
+  };
+
+  const handleSubmitManualOAuthCode = async () => {
+    const value = manualCodeInput.trim();
+    if (!value) return;
+    try {
+      await hostApiFetch('/api/providers/oauth/submit', {
+        method: 'POST',
+        body: JSON.stringify({ code: value }),
+      });
+      setOauthError(null);
+    } catch (error) {
+      setOauthError(String(error));
+    }
   };
 
   // On mount, try to restore previously configured provider
@@ -868,6 +916,7 @@ function ProviderContent({
     let cancelled = false;
     (async () => {
       if (!selectedProvider) return;
+      setApiProtocol('openai-completions');
       try {
         const snapshot = await fetchProviderSnapshot();
         const statusMap = new Map(snapshot.statuses.map((status) => [status.id, status]));
@@ -880,7 +929,7 @@ function ProviderContent({
         const accountIdForLoad = preferredAccount?.id || selectedProvider;
         setSelectedAccountId(preferredAccount?.id || null);
 
-        const savedProvider = await hostApiFetch<{ baseUrl?: string; model?: string } | null>(
+        const savedProvider = await hostApiFetch<{ baseUrl?: string; model?: string; apiProtocol?: ProviderAccount['apiProtocol'] } | null>(
           `/api/providers/${encodeURIComponent(accountIdForLoad)}`,
         );
         const storedKey = (await hostApiFetch<{ apiKey: string | null }>(
@@ -892,6 +941,7 @@ function ProviderContent({
           const info = providers.find((p) => p.id === selectedProvider);
           setBaseUrl(savedProvider?.baseUrl || info?.defaultBaseUrl || '');
           setModelId(savedProvider?.model || info?.defaultModelId || '');
+          setApiProtocol(savedProvider?.apiProtocol || 'openai-completions');
         }
       } catch (error) {
         if (!cancelled) {
@@ -926,6 +976,7 @@ function ProviderContent({
   }, [providerMenuOpen]);
 
   const selectedProviderData = providers.find((p) => p.id === selectedProvider);
+  const providerDocsUrl = getProviderDocsUrl(selectedProviderData, i18n.language);
   const selectedProviderIconUrl = selectedProviderData
     ? getProviderIconUrl(selectedProviderData.id)
     : undefined;
@@ -965,7 +1016,12 @@ function ProviderContent({
           'provider:validateKey',
           selectedAccountId || selectedProvider,
           apiKey,
-          { baseUrl: baseUrl.trim() || undefined }
+          {
+            baseUrl: baseUrl.trim() || undefined,
+            apiProtocol: (selectedProvider === 'custom' || selectedProvider === 'ollama')
+              ? apiProtocol
+              : undefined,
+          }
         ) as { valid: boolean; error?: string };
 
         setKeyValid(result.valid);
@@ -1002,6 +1058,9 @@ function ProviderContent({
           ? 'local'
           : 'api_key',
         baseUrl: baseUrl.trim() || undefined,
+        apiProtocol: (selectedProvider === 'custom' || selectedProvider === 'ollama')
+          ? apiProtocol
+          : undefined,
         model: effectiveModelId,
         enabled: true,
         isDefault: false,
@@ -1019,6 +1078,7 @@ function ProviderContent({
                 label: accountPayload.label,
                 authMode: accountPayload.authMode,
                 baseUrl: accountPayload.baseUrl,
+                apiProtocol: accountPayload.apiProtocol,
                 model: accountPayload.model,
                 enabled: accountPayload.enabled,
               },
@@ -1081,7 +1141,20 @@ function ProviderContent({
     <div className="space-y-6">
       {/* Provider selector — dropdown */}
       <div className="space-y-2">
-        <Label>{t('provider.label')}</Label>
+        <div className="flex items-center justify-between gap-3">
+          <Label>{t('provider.label')}</Label>
+          {selectedProvider && providerDocsUrl && (
+            <a
+              href={providerDocsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[13px] text-blue-500 hover:text-blue-600 font-medium inline-flex items-center gap-1"
+            >
+              {t('settings:aiProviders.dialog.customDoc')}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
         <div className="relative" ref={providerMenuRef}>
           <button
             type="button"
@@ -1175,7 +1248,7 @@ function ProviderContent({
               <Input
                 id="baseUrl"
                 type="text"
-                placeholder="https://api.example.com/v1"
+                placeholder={getProtocolBaseUrlPlaceholder(apiProtocol)}
                 value={baseUrl}
                 onChange={(e) => {
                   setBaseUrl(e.target.value);
@@ -1206,6 +1279,59 @@ function ProviderContent({
               <p className="text-xs text-muted-foreground">
                 {t('provider.modelIdDesc')}
               </p>
+            </div>
+          )}
+
+          {selectedProvider === 'custom' && (
+            <div className="space-y-2">
+              <Label>{t('provider.protocol')}</Label>
+              <div className="flex gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApiProtocol('openai-completions');
+                    onConfiguredChange(false);
+                  }}
+                  className={cn(
+                    'flex-1 py-2 px-3 rounded-lg border transition-colors',
+                    apiProtocol === 'openai-completions'
+                      ? 'bg-primary/10 border-primary/30 font-medium'
+                      : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  {t('provider.protocols.openaiCompletions')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApiProtocol('openai-responses');
+                    onConfiguredChange(false);
+                  }}
+                  className={cn(
+                    'flex-1 py-2 px-3 rounded-lg border transition-colors',
+                    apiProtocol === 'openai-responses'
+                      ? 'bg-primary/10 border-primary/30 font-medium'
+                      : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  {t('provider.protocols.openaiResponses')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApiProtocol('anthropic-messages');
+                    onConfiguredChange(false);
+                  }}
+                  className={cn(
+                    'flex-1 py-2 px-3 rounded-lg border transition-colors',
+                    apiProtocol === 'anthropic-messages'
+                      ? 'bg-primary/10 border-primary/30 font-medium'
+                      : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  {t('provider.protocols.anthropic')}
+                </button>
+              </div>
             </div>
           )}
 
@@ -1265,14 +1391,14 @@ function ProviderContent({
           {/* Device OAuth Trigger */}
           {useOAuthFlow && (
             <div className="space-y-4 pt-2">
-              <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-4 text-center">
-                <p className="text-sm text-purple-200 mb-3 block">
+              <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-4 text-center">
+                <p className="text-sm text-blue-200 mb-3 block">
                   This provider requires signing in via your browser.
                 </p>
                 <Button
                   onClick={handleStartOAuth}
                   disabled={oauthFlowing}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   {oauthFlowing ? (
                     <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Waiting...</>
@@ -1302,6 +1428,42 @@ function ProviderContent({
                       <div className="space-y-3 py-4">
                         <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
                         <p className="text-sm text-muted-foreground animate-pulse">Requesting secure login code...</p>
+                      </div>
+                    ) : oauthData.mode === 'manual' ? (
+                      <div className="space-y-4 w-full">
+                        <div className="space-y-1">
+                          <h3 className="font-medium text-lg">Complete OpenAI Login</h3>
+                          <p className="text-sm text-muted-foreground text-left mt-2">
+                            {oauthData.message || 'Open the authorization page, complete login, then paste the callback URL or code below.'}
+                          </p>
+                        </div>
+
+                        <Button
+                          variant="secondary"
+                          className="w-full"
+                          onClick={() => invokeIpc('shell:openExternal', oauthData.authorizationUrl)}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open Authorization Page
+                        </Button>
+
+                        <Input
+                          placeholder="Paste callback URL or code"
+                          value={manualCodeInput}
+                          onChange={(e) => setManualCodeInput(e.target.value)}
+                        />
+
+                        <Button
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={handleSubmitManualOAuthCode}
+                          disabled={!manualCodeInput.trim()}
+                        >
+                          Submit Code
+                        </Button>
+
+                        <Button variant="ghost" size="sm" className="w-full mt-2" onClick={handleCancelOAuth}>
+                          Cancel
+                        </Button>
                       </div>
                     ) : (
                       <div className="space-y-4 w-full">
@@ -1532,21 +1694,18 @@ function InstallingContent({ skills, onComplete, onSkip }: InstallingContentProp
         >
           <div className="flex items-start gap-2">
             <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-            <div className="space-y-2">
+            <div className="space-y-1">
               <p className="font-semibold">{t('installing.error')}</p>
               <pre className="text-xs bg-black/30 p-2 rounded overflow-x-auto whitespace-pre-wrap font-monospace">
                 {errorMessage}
               </pre>
-              <p className="text-xs text-red-300/80">{t('installing.errorHint')}</p>
-              <div className="flex items-center gap-3 pt-1">
-                <Button
-                  variant="link"
-                  className="text-red-400 p-0 h-auto text-xs underline"
-                  onClick={() => window.location.reload()}
-                >
-                  {t('installing.restart')}
-                </Button>
-              </div>
+              <Button
+                variant="link"
+                className="text-red-400 p-0 h-auto text-xs underline"
+                onClick={() => window.location.reload()}
+              >
+                {t('installing.restart')}
+              </Button>
             </div>
           </div>
         </motion.div>
@@ -1559,8 +1718,8 @@ function InstallingContent({ skills, onComplete, onSkip }: InstallingContentProp
       )}
       <div className="flex justify-end">
         <Button
-          variant={errorMessage ? 'default' : 'ghost'}
-          className={errorMessage ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'text-muted-foreground'}
+          variant="ghost"
+          className="text-muted-foreground"
           onClick={onSkip}
         >
           {t('installing.skip')}

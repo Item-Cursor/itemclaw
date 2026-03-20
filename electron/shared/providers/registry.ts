@@ -32,7 +32,6 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
     defaultModelId: 'gpt-5.2',
     isOAuth: true,
     supportsApiKey: true,
-    apiKeyUrl: 'https://platform.openai.com/api-keys',
     supportedAuthModes: ['api_key', 'oauth_browser'],
     defaultAuthMode: 'api_key',
     supportsMultipleAccounts: true,
@@ -79,7 +78,7 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
       apiKeyEnv: 'OPENROUTER_API_KEY',
       headers: {
         'HTTP-Referer': 'https://claw-x.com',
-        'X-Title': 'ItemClaw',
+        'X-Title': 'ClawX',
       },
     },
   },

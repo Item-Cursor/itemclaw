@@ -1,19 +1,25 @@
 /**
  * TitleBar Component
  * macOS: empty drag region (native traffic lights handled by hiddenInset).
- * Windows/Linux: icon + "ItemClaw" on left, minimize/maximize/close on right.
+ * Windows: drag region with custom minimize/maximize/close controls.
+ * Linux: use native window chrome (no custom title bar).
  */
 import { useState, useEffect } from 'react';
 import { Minus, Square, X, Copy } from 'lucide-react';
 import logoSvg from '@/assets/logo.svg';
 import { invokeIpc } from '@/lib/api-client';
 
-const isMac = window.electron?.platform === 'darwin';
-
 export function TitleBar() {
-  if (isMac) {
+  const platform = window.electron?.platform;
+
+  if (platform === 'darwin') {
     // macOS: just a drag region, traffic lights are native
     return <div className="drag-region h-10 shrink-0 border-b bg-background" />;
+  }
+
+  // Linux keeps the native frame/title bar for better IME compatibility.
+  if (platform !== 'win32') {
+    return null;
   }
 
   return <WindowsTitleBar />;
@@ -47,10 +53,9 @@ function WindowsTitleBar() {
 
   return (
     <div className="drag-region flex h-10 shrink-0 items-center justify-between border-b bg-background">
-      {/* Left: Icon + App Name */}
       <div className="no-drag flex items-center gap-2 pl-3">
         <img src={logoSvg} alt="ItemClaw" className="h-5 w-auto" />
-        <span className="text-xs font-medium text-muted-foreground select-none">
+        <span className="select-none text-xs font-medium text-muted-foreground">
           ItemClaw
         </span>
       </div>

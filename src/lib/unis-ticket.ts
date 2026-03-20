@@ -1,6 +1,5 @@
 /**
  * Unis Ticket authentication helpers.
- * Ported from the legacy itemclaw project's useWelcomeUnisTicket hook.
  */
 
 const UNIS_TICKET_BASE_URL = 'https://unisticket.item.com/api/item-tickets';
@@ -14,7 +13,18 @@ export type UnisTicketCredentials = {
 type LoginResponse = {
   success?: boolean;
   msg?: string;
-  data?: { session?: { token?: string } };
+  token?: string;
+  iamClientCredentialToken?: string;
+  data?: {
+    token?: string;
+    iamClientCredentialToken?: string;
+    iam_client_credential_token?: string;
+    session?: {
+      token?: string;
+      iamClientCredentialToken?: string;
+      iam_client_credential_token?: string;
+    };
+  };
 };
 
 async function parseJsonOrError(res: Response): Promise<LoginResponse | null> {
@@ -30,7 +40,12 @@ async function parseJsonOrError(res: Response): Promise<LoginResponse | null> {
 
 export async function loginUnisTicket(
   credentials: UnisTicketCredentials,
-): Promise<{ ok: boolean; token?: string; error?: string }> {
+): Promise<{
+  ok: boolean;
+  token?: string;
+  iamClientCredentialToken?: string;
+  error?: string;
+}> {
   const emailOrUsername = credentials.emailOrUsername.trim();
   const { password } = credentials;
   if (!emailOrUsername || !password) {
@@ -53,8 +68,21 @@ export async function loginUnisTicket(
         error: `Server returned non-JSON (${res.status}). The Unis Ticket API may not be available.`,
       };
     }
-    if (res.ok && data.success === true && data.data?.session?.token) {
-      return { ok: true, token: data.data.session.token };
+    const sessionToken = data.data?.session?.token
+      || data.data?.token
+      || data.token;
+    const iamToken = data.data?.session?.iamClientCredentialToken
+      || data.data?.session?.iam_client_credential_token
+      || data.data?.iamClientCredentialToken
+      || data.data?.iam_client_credential_token
+      || data.iamClientCredentialToken;
+
+    if (res.ok && data.success === true && (sessionToken || iamToken)) {
+      return {
+        ok: true,
+        token: sessionToken || iamToken,
+        iamClientCredentialToken: iamToken || sessionToken,
+      };
     }
     return { ok: false, error: data.msg ?? `Sign-in failed (${res.status})` };
   } catch (err) {

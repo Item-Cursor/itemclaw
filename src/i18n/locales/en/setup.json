@@ -1,7 +1,7 @@
 {
     "steps": {
         "welcome": {
-            "title": "Welcome to ItemClaw",
+            "title": "Welcome to ClawX",
             "description": "Your AI assistant is ready to be configured"
         },
         "runtime": {
@@ -18,16 +18,16 @@
         },
         "installing": {
             "title": "Setting Up",
-            "description": "Installing optional components"
+            "description": "Installing essential components"
         },
         "complete": {
             "title": "All Set!",
-            "description": "ItemClaw is ready to use"
+            "description": "ClawX is ready to use"
         }
     },
     "welcome": {
-        "title": "Welcome to ItemClaw",
-        "description": "ItemClaw is a graphical interface for OpenClaw, making it easy to use AI assistants across your favorite messaging platforms.",
+        "title": "Welcome to ClawX",
+        "description": "ClawX is a graphical interface for OpenClaw, making it easy to use AI assistants across your favorite messaging platforms.",
         "features": {
             "noCommand": "Zero command-line required",
             "modernUI": "Modern, beautiful interface",
@@ -67,6 +67,12 @@
         "baseUrl": "Base URL",
         "modelId": "Model ID",
         "modelIdDesc": "The model identifier from your provider (e.g. deepseek-ai/DeepSeek-V3)",
+        "protocol": "Protocol",
+        "protocols": {
+            "openaiCompletions": "OpenAI Completions",
+            "openaiResponses": "OpenAI Responses",
+            "anthropic": "Anthropic Compatible"
+        },
         "apiKey": "API Key",
         "save": "Save",
         "validateSave": "Validate & Save",
@@ -86,8 +92,8 @@
         "configureAnother": "Configure another channel"
     },
     "installing": {
-        "title": "Installing Components",
-        "subtitle": "These tools enhance your experience but are not required. You can skip this step and install them later from Settings.",
+        "title": "Installing Essential Components",
+        "subtitle": "Setting up the tools needed to power your AI assistant",
         "progress": "Progress",
         "status": {
             "pending": "Pending",
@@ -95,15 +101,14 @@
             "installed": "Installed",
             "failed": "Failed"
         },
-        "error": "Some components could not be installed:",
-        "errorHint": "This is OK — the app works without them. You can retry from Settings later.",
+        "error": "Setup Error:",
         "restart": "Try restarting the app",
         "wait": "This may take a few moments...",
-        "skip": "Skip and continue"
+        "skip": "Skip this step"
     },
     "complete": {
         "title": "Setup Complete!",
-        "subtitle": "ItemClaw is configured and ready to use. You can now start chatting with your AI assistant.",
+        "subtitle": "ClawX is configured and ready to use. You can now start chatting with your AI assistant.",
         "provider": "AI Provider",
         "components": "Components",
         "gateway": "Gateway",

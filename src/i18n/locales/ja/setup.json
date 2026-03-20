@@ -1,7 +1,7 @@
 {
     "steps": {
         "welcome": {
-            "title": "ItemClawへようこそ",
+            "title": "ClawXへようこそ",
             "description": "AIアシスタントの設定準備が整いました"
         },
         "runtime": {
@@ -18,16 +18,16 @@
         },
         "installing": {
             "title": "セットアップ中",
-            "description": "オプションのコンポーネントをインストール中"
+            "description": "必須コンポーネントをインストール中"
         },
         "complete": {
             "title": "完了！",
-            "description": "ItemClawを使用する準備が整いました"
+            "description": "ClawXを使用する準備が整いました"
         }
     },
     "welcome": {
-        "title": "ItemClawへようこそ",
-        "description": "ItemClawはOpenClawのグラフィカルインターフェースで、お気に入りのメッセージングプラットフォームでAIアシスタントを簡単に使用できます。",
+        "title": "ClawXへようこそ",
+        "description": "ClawXはOpenClawのグラフィカルインターフェースで、お気に入りのメッセージングプラットフォームでAIアシスタントを簡単に使用できます。",
         "features": {
             "noCommand": "コマンドライン不要",
             "modernUI": "モダンで美しいインターフェース",
@@ -67,6 +67,12 @@
         "baseUrl": "ベース URL",
         "modelId": "モデル ID",
         "modelIdDesc": "プロバイダーのモデル識別子（例：deepseek-ai/DeepSeek-V3）",
+        "protocol": "プロトコル",
+        "protocols": {
+            "openaiCompletions": "OpenAI Completions",
+            "openaiResponses": "OpenAI Responses",
+            "anthropic": "Anthropic 互換"
+        },
         "apiKey": "API キー",
         "save": "保存",
         "validateSave": "検証して保存",
@@ -86,8 +92,8 @@
         "configureAnother": "別のチャンネルを構成"
     },
     "installing": {
-        "title": "コンポーネントのインストール",
-        "subtitle": "これらのツールは体験を向上させますが、必須ではありません。このステップをスキップして、後で設定からインストールできます。",
+        "title": "必須コンポーネントをインストール中",
+        "subtitle": "AIアシスタントに必要なツールをセットアップしています",
         "progress": "進捗",
         "status": {
             "pending": "待機中",
@@ -95,15 +101,14 @@
             "installed": "インストール済み",
             "failed": "失敗"
         },
-        "error": "一部のコンポーネントをインストールできませんでした：",
-        "errorHint": "問題ありません。これらのコンポーネントがなくてもアプリは動作します。後で設定から再試行できます。",
+        "error": "セットアップエラー：",
         "restart": "アプリを再起動してください",
         "wait": "これには少し時間がかかる場合があります...",
-        "skip": "スキップして続行"
+        "skip": "この手順をスキップ"
     },
     "complete": {
         "title": "セットアップ完了！",
-        "subtitle": "ItemClawの構成が完了し、使用準備が整いました。AIアシスタントとのチャットを開始できます。",
+        "subtitle": "ClawXの構成が完了し、使用準備が整いました。AIアシスタントとのチャットを開始できます。",
         "provider": "AI プロバイダー",
         "components": "コンポーネント",
         "gateway": "ゲートウェイ",

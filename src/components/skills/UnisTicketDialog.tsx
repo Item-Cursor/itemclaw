@@ -1,8 +1,6 @@
 /**
  * Unis Ticket skill flyout.
- * Instead of API key / env vars, this shows an email + password sign-in form
- * that authenticates against the Unis Ticket REST API and stores the session
- * token as the skill's apiKey.
+ * Shows an email + password sign-in form and stores the session token as apiKey.
  */
 import { useState, useCallback } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
@@ -26,6 +24,9 @@ interface Props {
   onToggle: (enabled: boolean) => void;
 }
 
+const UNIS_TICKET_TOKEN_ENV_KEY = 'UNIS_TICKET_TOKEN';
+const IAM_CLIENT_CREDENTIAL_TOKEN_ENV_KEY = 'IAM_CLIENT_CREDENTIAL_TOKEN';
+
 export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
   const { t } = useTranslation('skills');
   const { fetchSkills } = useSkillsStore();
@@ -38,6 +39,7 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
   const isConnected = !!skill?.config?.apiKey;
 
   const handleSignIn = useCallback(async () => {
+    if (!skill) return;
     if (!emailOrUsername.trim() || !password) {
       setError('Email/username and password are required.');
       return;
@@ -52,8 +54,15 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
         password,
       });
 
-      if (!loginResult.ok || !loginResult.token) {
+      if (!loginResult.ok || (!loginResult.token && !loginResult.iamClientCredentialToken)) {
         setError(loginResult.error ?? 'Sign-in failed');
+        return;
+      }
+
+      const resolvedSessionToken = loginResult.token || loginResult.iamClientCredentialToken;
+      const resolvedIamToken = loginResult.iamClientCredentialToken || loginResult.token;
+      if (!resolvedSessionToken || !resolvedIamToken) {
+        setError('Missing Unis Ticket session token');
         return;
       }
 
@@ -61,8 +70,11 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
         'skill:updateConfig',
         {
           skillKey: skill.id,
-          apiKey: loginResult.token,
-          env: {},
+          apiKey: resolvedSessionToken,
+          env: {
+            [UNIS_TICKET_TOKEN_ENV_KEY]: resolvedSessionToken,
+            [IAM_CLIENT_CREDENTIAL_TOKEN_ENV_KEY]: resolvedIamToken,
+          },
         },
       ) as { success: boolean; error?: string };
 
@@ -70,7 +82,7 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
         throw new Error(result.error || 'Failed to save token');
       }
 
-      if (!skill?.enabled) {
+      if (!skill.enabled) {
         onToggle(true);
       }
 
@@ -83,7 +95,7 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [emailOrUsername, password, skill?.enabled, fetchSkills, onToggle]);
+  }, [emailOrUsername, fetchSkills, onToggle, password, skill]);
 
   if (!skill) return null;
 
@@ -166,7 +178,6 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
               Your credentials are used to obtain a session token that is stored locally. The password is never stored.
             </p>
 
-            {/* Enable/Disable toggle */}
             {isConnected && (
               <div className="flex items-center justify-between pt-2">
                 <span className="text-[13px] font-medium text-foreground/80">Enabled</span>

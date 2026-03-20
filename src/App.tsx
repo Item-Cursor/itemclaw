@@ -20,7 +20,6 @@ import { Setup } from './pages/Setup';
 import { useSettingsStore } from './stores/settings';
 import { useGatewayStore } from './stores/gateway';
 import { applyGatewayTransportPreference } from './lib/api-client';
-import { UpdateNotifier } from './components/update/UpdateNotifier';
 
 
 /**
@@ -176,7 +175,6 @@ function App() {
         </Routes>
 
         {/* Global toast notifications */}
-        <UpdateNotifier />
         <Toaster
           position="bottom-right"
           richColors

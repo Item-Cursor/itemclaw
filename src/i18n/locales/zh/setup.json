@@ -1,7 +1,7 @@
 {
     "steps": {
         "welcome": {
-            "title": "欢迎使用 ItemClaw",
+            "title": "欢迎使用 ClawX",
             "description": "您的 AI 助手已准备好进行配置"
         },
         "runtime": {
@@ -18,16 +18,16 @@
         },
         "installing": {
             "title": "设置中",
-            "description": "安装可选组件"
+            "description": "安装必要组件"
         },
         "complete": {
             "title": "准备就绪！",
-            "description": "ItemClaw 已准备好使用"
+            "description": "ClawX 已准备好使用"
         }
     },
     "welcome": {
-        "title": "欢迎使用 ItemClaw",
-        "description": "ItemClaw 是 OpenClaw 的图形界面，让您可以在喜爱的消息平台上轻松使用 AI 助手。",
+        "title": "欢迎使用 ClawX",
+        "description": "ClawX 是 OpenClaw 的图形界面，让您可以在喜爱的消息平台上轻松使用 AI 助手。",
         "features": {
             "noCommand": "无需命令行",
             "modernUI": "现代美观的界面",
@@ -67,6 +67,12 @@
         "baseUrl": "基础 URL",
         "modelId": "模型 ID",
         "modelIdDesc": "提供商的模型标识符（例如 deepseek-ai/DeepSeek-V3）",
+        "protocol": "协议",
+        "protocols": {
+            "openaiCompletions": "OpenAI Completions",
+            "openaiResponses": "OpenAI Responses",
+            "anthropic": "Anthropic 兼容"
+        },
         "apiKey": "API 密钥",
         "save": "保存",
         "validateSave": "验证并保存",
@@ -86,8 +92,8 @@
         "configureAnother": "配置另一个渠道"
     },
     "installing": {
-        "title": "安装组件",
-        "subtitle": "这些工具可以增强您的体验，但不是必需的。您可以跳过此步骤，稍后在设置中安装。",
+        "title": "安装必要组件",
+        "subtitle": "正在设置 AI 助手所需的工具",
         "progress": "进度",
         "status": {
             "pending": "等待中",
@@ -95,15 +101,14 @@
             "installed": "已安装",
             "failed": "失败"
         },
-        "error": "部分组件安装失败：",
-        "errorHint": "没关系——应用无需这些组件也能正常运行。您可以稍后在设置中重试。",
+        "error": "设置错误：",
         "restart": "尝试重启应用",
         "wait": "这可能需要一点时间...",
-        "skip": "跳过并继续"
+        "skip": "跳过此步骤"
     },
     "complete": {
         "title": "设置完成！",
-        "subtitle": "ItemClaw 已配置并准备就绪。您现在可以开始与您的 AI 助手聊天了。",
+        "subtitle": "ClawX 已配置并准备就绪。您现在可以开始与您的 AI 助手聊天了。",
         "provider": "AI 提供商",
         "components": "组件",
         "gateway": "网关",

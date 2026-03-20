@@ -26,6 +26,9 @@ extraResources:
   # because electron-builder respects .gitignore which excludes node_modules/)
   - from: build/openclaw/
     to: openclaw/
+  # Pre-bundled third-party skills (full directories, not only SKILL.md)
+  - from: build/preinstalled-skills/
+    to: resources/preinstalled-skills/
   # NOTE: OpenClaw plugin mirrors (dingtalk, etc.) are bundled by the
   # afterPack hook (after-pack.cjs) directly from node_modules, so they
   # don't need an extraResources entry here.
@@ -100,11 +103,9 @@ dmg:
 
 # Windows Configuration
 win:
-  forceCodeSigning: false
+  # Skip update signature verification: we ship via OSS + GitHub without a
+  # code-signing certificate, so verifying would always fail on the updater.
   verifyUpdateCodeSignature: false
-  # false: avoids downloading winCodeSign; on Windows the 7z extract creates darwin symlinks
-  # which require Admin or Developer Mode and fail with "privilege is not held"
-  signAndEditExecutable: false
   extraResources:
     - from: resources/bin/win32-${arch}
       to: bin
@@ -113,9 +114,9 @@ win:
   icon: resources/icons/icon.ico
   target:
     - target: nsis
-      arch:
-        - x64
-        - arm64
+      arch: x64
+    - target: nsis
+      arch: arm64
     - target: msi
       arch:
         - x64

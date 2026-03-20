@@ -7,10 +7,10 @@
  * Port configuration
  */
 export const PORTS = {
-  /** ItemClaw GUI development server port */
+  /** ClawX GUI development server port */
   CLAWX_DEV: 5173,
   
-  /** ItemClaw GUI production port (for reference) */
+  /** ClawX GUI production port (for reference) */
   CLAWX_GUI: 23333,
 
   /** Local host API server port */
@@ -36,7 +36,7 @@ export const APP_PATHS = {
   /** OpenClaw configuration directory */
   OPENCLAW_CONFIG: '~/.openclaw',
   
-  /** ItemClaw configuration directory */
+  /** ClawX configuration directory */
   CLAWX_CONFIG: '~/.clawx',
   
   /** Log files directory */

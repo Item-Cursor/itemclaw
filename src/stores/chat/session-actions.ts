@@ -3,6 +3,25 @@ import { getCanonicalPrefixFromSessions, getMessageText, toMs } from './helpers'
 import { DEFAULT_CANONICAL_PREFIX, DEFAULT_SESSION_KEY, type ChatSession, type RawMessage } from './types';
 import type { ChatGet, ChatSet, SessionHistoryActions } from './store-api';
 
+function getAgentIdFromSessionKey(sessionKey: string): string {
+  if (!sessionKey.startsWith('agent:')) return 'main';
+  const [, agentId] = sessionKey.split(':');
+  return agentId || 'main';
+}
+
+function parseSessionUpdatedAtMs(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return toMs(value);
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
 export function createSessionActions(
   set: ChatSet,
   get: ChatGet,
@@ -25,6 +44,7 @@ export function createSessionActions(
             displayName: s.displayName ? String(s.displayName) : undefined,
             thinkingLevel: s.thinkingLevel ? String(s.thinkingLevel) : undefined,
             model: s.model ? String(s.model) : undefined,
+            updatedAt: parseSessionUpdatedAtMs(s.updatedAt),
           })).filter((s: ChatSession) => s.key);
 
           const canonicalBySuffix = new Map<string, string>();
@@ -70,7 +90,21 @@ export function createSessionActions(
             ]
             : dedupedSessions;
 
-          set({ sessions: sessionsWithCurrent, currentSessionKey: nextSessionKey });
+          const discoveredActivity = Object.fromEntries(
+            sessionsWithCurrent
+              .filter((session) => typeof session.updatedAt === 'number' && Number.isFinite(session.updatedAt))
+              .map((session) => [session.key, session.updatedAt!]),
+          );
+
+          set((state) => ({
+            sessions: sessionsWithCurrent,
+            currentSessionKey: nextSessionKey,
+            currentAgentId: getAgentIdFromSessionKey(nextSessionKey),
+            sessionLastActivity: {
+              ...state.sessionLastActivity,
+              ...discoveredActivity,
+            },
+          }));
 
           if (currentSessionKey !== nextSessionKey) {
             get().loadHistory();
@@ -119,10 +153,17 @@ export function createSessionActions(
     // ── Switch session ──
 
     switchSession: (key: string) => {
-      const { currentSessionKey, messages } = get();
-      const leavingEmpty = !currentSessionKey.endsWith(':main') && messages.length === 0;
+      const { currentSessionKey, messages, sessionLastActivity, sessionLabels } = get();
+      // 仅将没有任何历史记录且无活动时间的会话视为空会话。
+      // 单纯依赖 messages.length 是不可靠的，因为 switchSession 会在真正调用 loadHistory 前抢先清空当前 messages，
+      // 造成竞争条件，使得带有真实历史的会话被判定为空并从侧边栏移除。
+      const leavingEmpty = !currentSessionKey.endsWith(':main')
+        && messages.length === 0
+        && !sessionLastActivity[currentSessionKey]
+        && !sessionLabels[currentSessionKey];
       set((s) => ({
         currentSessionKey: key,
+        currentAgentId: getAgentIdFromSessionKey(key),
         messages: [],
         streamingText: '',
         streamingMessage: null,
@@ -190,6 +231,7 @@ export function createSessionActions(
           lastUserMessageAt: null,
           pendingToolImages: [],
           currentSessionKey: next?.key ?? DEFAULT_SESSION_KEY,
+          currentAgentId: getAgentIdFromSessionKey(next?.key ?? DEFAULT_SESSION_KEY),
         }));
         if (next) {
           get().loadHistory();
@@ -210,13 +252,18 @@ export function createSessionActions(
       // NOTE: We intentionally do NOT call sessions.reset on the old session.
       // sessions.reset archives (renames) the session JSONL file, making old
       // conversation history inaccessible when the user switches back to it.
-      const { currentSessionKey, messages } = get();
-      const leavingEmpty = !currentSessionKey.endsWith(':main') && messages.length === 0;
+      const { currentSessionKey, messages, sessionLastActivity, sessionLabels } = get();
+      // 仅将没有任何历史记录且无活动时间的会话视为空会话
+      const leavingEmpty = !currentSessionKey.endsWith(':main')
+        && messages.length === 0
+        && !sessionLastActivity[currentSessionKey]
+        && !sessionLabels[currentSessionKey];
       const prefix = getCanonicalPrefixFromSessions(get().sessions) ?? DEFAULT_CANONICAL_PREFIX;
       const newKey = `${prefix}:session-${Date.now()}`;
       const newSessionEntry: ChatSession = { key: newKey, displayName: newKey };
       set((s) => ({
         currentSessionKey: newKey,
+        currentAgentId: getAgentIdFromSessionKey(newKey),
         sessions: [
           ...(leavingEmpty ? s.sessions.filter((sess) => sess.key !== currentSessionKey) : s.sessions),
           newSessionEntry,
@@ -242,12 +289,17 @@ export function createSessionActions(
     // ── Cleanup empty session on navigate away ──
 
     cleanupEmptySession: () => {
-      const { currentSessionKey, messages } = get();
+      const { currentSessionKey, messages, sessionLastActivity, sessionLabels } = get();
       // Only remove non-main sessions that were never used (no messages sent).
       // This mirrors the "leavingEmpty" logic in switchSession so that creating
       // a new session and immediately navigating away doesn't leave a ghost entry
       // in the sidebar.
-      const isEmptyNonMain = !currentSessionKey.endsWith(':main') && messages.length === 0;
+      // 同样需要综合检查 sessionLastActivity 和 sessionLabels，
+      // 防止因为 switchSession 抢先清空 messages 而误判有历史的会话为空。
+      const isEmptyNonMain = !currentSessionKey.endsWith(':main')
+        && messages.length === 0
+        && !sessionLastActivity[currentSessionKey]
+        && !sessionLabels[currentSessionKey];
       if (!isEmptyNonMain) return;
       set((s) => ({
         sessions: s.sessions.filter((sess) => sess.key !== currentSessionKey),

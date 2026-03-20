@@ -26,35 +26,15 @@ function cleanUserText(text: string): string {
 }
 
 /**
- * Strip model reasoning tags (<think>, <final>, etc.) from assistant text.
- * Some models emit inline reasoning wrapped in these tags instead of using
- * structured thinking content blocks. We strip the tags (and their inner
- * content for <think> blocks, since thinking is shown separately) so they
- * don't leak into the rendered chat bubble.
- */
-function stripReasoningTags(text: string): string {
-  return text
-    // Remove <think>…</think> blocks entirely (content belongs in thinking panel)
-    .replace(/<think>[\s\S]*?<\/think>/gi, '')
-    // Remove orphaned opening <think> with no closing tag (streaming mid-chunk)
-    .replace(/<think>[\s\S]*$/gi, '')
-    // Unwrap <final>…</final> — keep inner content, drop the tags
-    .replace(/<\/?final>/gi, '')
-    .trim();
-}
-
-/**
  * Extract displayable text from a message's content field.
  * Handles both string content and array-of-blocks content.
  * For user messages, strips Gateway-injected metadata.
- * For assistant messages, strips model reasoning tags.
  */
 export function extractText(message: RawMessage | unknown): string {
   if (!message || typeof message !== 'object') return '';
   const msg = message as Record<string, unknown>;
   const content = msg.content;
   const isUser = msg.role === 'user';
-  const isAssistant = msg.role === 'assistant';
 
   let result = '';
 
@@ -81,17 +61,11 @@ export function extractText(message: RawMessage | unknown): string {
     result = cleanUserText(result);
   }
 
-  // Strip model reasoning tags from assistant messages
-  if (isAssistant && result) {
-    result = stripReasoningTags(result);
-  }
-
   return result;
 }
 
 /**
  * Extract thinking/reasoning content from a message.
- * Handles both structured thinking blocks and inline <think> tags.
  * Returns null if no thinking content found.
  */
 export function extractThinking(message: RawMessage | unknown): string | null {
@@ -99,43 +73,20 @@ export function extractThinking(message: RawMessage | unknown): string | null {
   const msg = message as Record<string, unknown>;
   const content = msg.content;
 
-  const parts: string[] = [];
+  if (!Array.isArray(content)) return null;
 
-  if (Array.isArray(content)) {
-    for (const block of content as ContentBlock[]) {
-      // Path 1: Structured thinking content blocks
-      if (block.type === 'thinking' && block.thinking) {
-        const cleaned = block.thinking.trim();
-        if (cleaned) {
-          parts.push(cleaned);
-        }
-      }
-      // Path 2: Inline <think> tags inside text blocks
-      if (block.type === 'text' && block.text) {
-        const inlineThinking = extractInlineThinkTags(block.text);
-        if (inlineThinking) parts.push(inlineThinking);
+  const parts: string[] = [];
+  for (const block of content as ContentBlock[]) {
+    if (block.type === 'thinking' && block.thinking) {
+      const cleaned = block.thinking.trim();
+      if (cleaned) {
+        parts.push(cleaned);
       }
     }
-  } else if (typeof content === 'string') {
-    // Path 3: Plain string content with inline <think> tags
-    const inlineThinking = extractInlineThinkTags(content);
-    if (inlineThinking) parts.push(inlineThinking);
   }
 
   const combined = parts.join('\n\n').trim();
   return combined.length > 0 ? combined : null;
-}
-
-/** Pull text out of <think>…</think> tags in a raw string. */
-function extractInlineThinkTags(text: string): string | null {
-  const matches: string[] = [];
-  const regex = /<think>([\s\S]*?)<\/think>/gi;
-  let m;
-  while ((m = regex.exec(text)) !== null) {
-    const inner = m[1].trim();
-    if (inner) matches.push(inner);
-  }
-  return matches.length > 0 ? matches.join('\n\n') : null;
 }
 
 /**

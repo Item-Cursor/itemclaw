@@ -17,11 +17,7 @@
  */
 
 import 'zx/globals';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import fs from 'node:fs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT = path.join(ROOT, 'build', 'openclaw');
 const NODE_MODULES = path.join(ROOT, 'node_modules');
@@ -33,45 +29,16 @@ function normWin(p) {
   return '\\\\?\\' + p.replace(/\//g, '\\');
 }
 
-// On Windows, avoid reaching drive root (e.g. "C:" or "C:\") which can make fs throw EISDIR/lstat 'C:'.
-function isDriveRoot(dir) {
-  if (process.platform !== 'win32') return false;
-  const normalized = path.resolve(dir).replace(/\//g, path.sep);
-  return normalized.length <= 3 && /^[A-Za-z]:[\\/]?$/.test(normalized);
-}
-
-// Resolve to real path (follow symlinks). On Windows, never use fs.realpathSync (can throw EISDIR/lstat 'C:').
-function safeRealpathSync(p) {
-  const full = path.resolve(p);
-  if (process.platform === 'win32') {
-    let current = full;
-    for (;;) {
-      if (isDriveRoot(current)) return current;
-      try {
-        const stat = fs.lstatSync(current);
-        if (!stat.isSymbolicLink()) return current;
-        const target = fs.readlinkSync(current);
-        const next = path.resolve(path.dirname(current), target);
-        if (isDriveRoot(next) || next === current) return current;
-        current = next;
-      } catch {
-        return current;
-      }
-    }
-  }
-  return fs.realpathSync(full);
-}
-
 echo`📦 Bundling openclaw for electron-builder...`;
 
 // 1. Resolve the real path of node_modules/openclaw (follows pnpm symlink)
-const openclawLink = path.resolve(ROOT, 'node_modules', 'openclaw');
+const openclawLink = path.join(NODE_MODULES, 'openclaw');
 if (!fs.existsSync(openclawLink)) {
   echo`❌ node_modules/openclaw not found. Run pnpm install first.`;
   process.exit(1);
 }
 
-const openclawReal = safeRealpathSync(openclawLink);
+const openclawReal = fs.realpathSync(openclawLink);
 echo`   openclaw resolved: ${openclawReal}`;
 
 // 2. Clean and create output directory
@@ -166,6 +133,12 @@ queue.push({ nodeModulesDir: openclawVirtualNM, skipPkg: 'openclaw' });
 const SKIP_PACKAGES = new Set([
   'typescript',
   '@playwright/test',
+  // @discordjs/opus is a native .node addon compiled for the system Node.js
+  // ABI. The Gateway runs inside Electron's utilityProcess which has a
+  // different ABI, so the binary fails with "Cannot find native binding".
+  // The package is optional — openclaw gracefully degrades when absent
+  // (only Discord voice features are affected; text chat works fine).
+  '@discordjs/opus',
 ]);
 const SKIP_SCOPES = ['@cloudflare/', '@types/'];
 let skippedDevCount = 0;
@@ -185,7 +158,7 @@ while (queue.length > 0) {
 
     let realPath;
     try {
-      realPath = safeRealpathSync(fullPath);
+      realPath = fs.realpathSync(fullPath);
     } catch {
       continue; // broken symlink, skip
     }
@@ -383,6 +356,7 @@ function cleanupBundle(outputDir) {
     'node_modules/koffi/src',
     'node_modules/koffi/vendor',
     'node_modules/koffi/doc',
+    'extensions/feishu', // Removed in favor of official @larksuite/openclaw-lark plugin
   ];
   for (const rel of LARGE_REMOVALS) {
     if (rmSafe(path.join(outputDir, rel))) removedCount++;

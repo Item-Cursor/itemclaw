@@ -55,9 +55,6 @@ export function UpdateSettings() {
       case 'downloaded':
         return <Rocket className="h-4 w-4 text-primary" />;
       case 'error':
-        if (error?.includes('dev mode')) {
-          return <RefreshCw className="h-4 w-4 text-muted-foreground" />;
-        }
         return <RefreshCw className="h-4 w-4 text-destructive" />;
       default:
         return <RefreshCw className="h-4 w-4 text-muted-foreground" />;
@@ -78,9 +75,6 @@ export function UpdateSettings() {
       case 'downloaded':
         return t('updates.status.downloaded', { version: updateInfo?.version });
       case 'error':
-        if (error?.includes('dev mode')) {
-          return t('updates.status.devMode', 'Update check skipped (dev mode \u2013 app is not packaged)');
-        }
         return error || t('updates.status.failed');
       case 'not-available':
         return t('updates.status.latest');
@@ -206,8 +200,8 @@ export function UpdateSettings() {
         </div>
       )}
 
-      {/* Error Details (hidden for dev mode, shown for real errors) */}
-      {status === 'error' && error && !error.includes('dev mode') && (
+      {/* Error Details */}
+      {status === 'error' && error && (
         <div className="rounded-lg bg-red-50 dark:bg-red-900/10 p-4 text-red-600 dark:text-red-400 text-sm">
           <p className="font-medium mb-1">{t('updates.errorDetails')}</p>
           <p>{error}</p>
