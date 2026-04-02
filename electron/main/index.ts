@@ -4,7 +4,7 @@
  */
 import { app, BrowserWindow, nativeImage, session, shell } from 'electron';
 import type { Server } from 'node:http';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { GatewayManager } from '../gateway/manager';
 import { registerIpcHandlers } from './ipc-handlers';
 import { createTray } from './tray';
@@ -36,8 +36,10 @@ import { deviceOAuthManager } from '../utils/device-oauth';
 import { browserOAuthManager } from '../utils/browser-oauth';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
 import { syncAllProviderAuthToRuntime } from '../services/providers/provider-runtime-sync';
+import { dispatchUnisIamDeepLink } from '../utils/unis-iam-oauth';
 
 const WINDOWS_APP_USER_MODEL_ID = 'app.clawx.desktop';
+const ITEMCLAW_PROTOCOL = 'itemclaw';
 
 // Disable GPU hardware acceleration globally for maximum stability across
 // all GPU configurations (no GPU, integrated, discrete).
@@ -79,6 +81,10 @@ let gatewayManager!: GatewayManager;
 let clawHubService!: ClawHubService;
 let hostEventBus!: HostEventBus;
 let hostApiServer: Server | null = null;
+/** When true, {@link app.quit} may proceed without running async teardown again. */
+let appQuitTeardownComplete = false;
+/** Prevents duplicate async shutdown work if `before-quit` fires more than once. */
+let appQuitTeardownStarted = false;
 const mainWindowFocusState = createMainWindowFocusState();
 
 /**
@@ -410,6 +416,12 @@ async function initialize(): Promise<void> {
   }).catch((error) => {
     logger.warn('CLI auto-install failed:', error);
   });
+
+  // Windows/Linux: OAuth may launch the app with itemclaw:// on the command line (cold start).
+  const argvIamUrl = process.argv.find((a) => typeof a === 'string' && a.startsWith(`${ITEMCLAW_PROTOCOL}://`));
+  if (argvIamUrl) {
+    dispatchUnisIamDeepLink(argvIamUrl);
+  }
 }
 
 if (gotTheLock) {
@@ -417,12 +429,31 @@ if (gotTheLock) {
     app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
   }
 
+  try {
+    if (process.defaultApp) {
+      const entry = process.argv[1];
+      if (entry) {
+        app.setAsDefaultProtocolClient(ITEMCLAW_PROTOCOL, process.execPath, [resolve(entry)]);
+      }
+    } else {
+      app.setAsDefaultProtocolClient(ITEMCLAW_PROTOCOL);
+    }
+  } catch (error) {
+    logger.warn('Failed to register itemclaw:// protocol handler:', error);
+  }
+
   gatewayManager = new GatewayManager();
   clawHubService = new ClawHubService();
   hostEventBus = new HostEventBus();
 
   // When a second instance is launched, focus the existing window instead.
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, commandLine) => {
+    const deeplink = commandLine.find((c) => typeof c === 'string' && c.startsWith(`${ITEMCLAW_PROTOCOL}://`));
+    if (deeplink) {
+      dispatchUnisIamDeepLink(deeplink);
+      focusMainWindow();
+    }
+
     logger.info('Second ClawX instance detected; redirecting to the existing window');
 
     const focusRequest = requestSecondInstanceFocus(
@@ -436,6 +467,14 @@ if (gotTheLock) {
     }
 
     logger.debug('Main window is not ready yet; deferring second-instance focus until ready-to-show');
+  });
+
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    if (url.startsWith(`${ITEMCLAW_PROTOCOL}://`)) {
+      dispatchUnisIamDeepLink(url);
+      focusMainWindow();
+    }
   });
 
   // Application lifecycle
@@ -461,15 +500,29 @@ if (gotTheLock) {
     }
   });
 
-  app.on('before-quit', () => {
-    setQuitting();
-    hostEventBus.closeAll();
-    hostApiServer?.close();
-    // Fire-and-forget: do not await gatewayManager.stop() here.
-    // Awaiting inside before-quit can stall Electron's quit sequence.
-    void gatewayManager.stop().catch((err) => {
-      logger.warn('gatewayManager.stop() error during quit:', err);
-    });
+  app.on('before-quit', (event) => {
+    if (appQuitTeardownComplete) {
+      return;
+    }
+    if (appQuitTeardownStarted) {
+      event.preventDefault();
+      return;
+    }
+    appQuitTeardownStarted = true;
+    event.preventDefault();
+
+    void (async () => {
+      setQuitting();
+      hostEventBus.closeAll();
+      hostApiServer?.close();
+      try {
+        await gatewayManager.stop();
+      } catch (err) {
+        logger.warn('gatewayManager.stop() error during quit:', err);
+      }
+      appQuitTeardownComplete = true;
+      app.quit();
+    })();
   });
 }
 

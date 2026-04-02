@@ -117,6 +117,9 @@ const electronAPI = {
         'skill:updateConfig',
         'skill:getConfig',
         'skill:getAllConfigs',
+        'skill:openUnisIamLogin',
+        'skill:unisIamExchange',
+        'skill:cancelUnisIamLogin',
         // Logs
         'log:getRecent',
         'log:readFile',
@@ -174,6 +177,7 @@ const electronAPI = {
         'oauth:code',
         'oauth:success',
         'oauth:error',
+        'skill:unis-iam-progress',
         'openclaw:cli-installed',
       ];
 

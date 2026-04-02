@@ -39,6 +39,15 @@ import {
   ensureWeComPluginInstalled,
 } from '../utils/plugin-install';
 import { updateSkillConfig, getSkillConfig, getAllSkillConfigs } from '../utils/skill-config';
+import {
+  cancelUnisIamLogin,
+  exchangeUnisTicketIamFromRedirectUrl,
+  openUnisTicketIamLogin,
+  unisIamOAuthEmitter,
+  type UnisIamExchangeOptions,
+  type UnisIamOpenLoginArg,
+  type UnisIamProgressPayload,
+} from '../utils/unis-iam-oauth';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
 import { getProviderConfig } from '../utils/provider-registry';
 import { deviceOAuthManager, OAuthProviderType } from '../utils/device-oauth';
@@ -132,7 +141,7 @@ export function registerIpcHandlers(
   registerUsageHandlers();
 
   // Skill config handlers (direct file access, no Gateway RPC)
-  registerSkillConfigHandlers();
+  registerSkillConfigHandlers(mainWindow);
 
   // Cron task handlers (proxy to Gateway RPC)
   registerCronHandlers(gatewayManager);
@@ -148,6 +157,11 @@ export function registerIpcHandlers(
 
   // File staging handlers (upload/send separation)
   registerFileHandlers();
+
+  unisIamOAuthEmitter.on('progress', (payload: UnisIamProgressPayload) => {
+    if (mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send('skill:unis-iam-progress', payload);
+  });
 }
 
 type HostApiFetchRequest = {
@@ -777,7 +791,7 @@ function registerUnifiedRequestHandlers(gatewayManager: GatewayManager): void {
  * Skill config IPC handlers
  * Direct read/write to ~/.openclaw/openclaw.json (bypasses Gateway RPC)
  */
-function registerSkillConfigHandlers(): void {
+function registerSkillConfigHandlers(mainWindow: BrowserWindow): void {
   // Update skill config (apiKey and env)
   ipcMain.handle('skill:updateConfig', async (_, params: {
     skillKey: string;
@@ -798,6 +812,26 @@ function registerSkillConfigHandlers(): void {
   // Get all skill configs
   ipcMain.handle('skill:getAllConfigs', async () => {
     return await getAllSkillConfigs();
+  });
+
+  ipcMain.handle(
+    'skill:openUnisIamLogin',
+    async (_, arg?: string | UnisIamOpenLoginArg) => {
+      return await openUnisTicketIamLogin(mainWindow, arg);
+    },
+  );
+
+  ipcMain.handle(
+    'skill:unisIamExchange',
+    async (_, params?: { pastedRedirectUrl: string } & UnisIamExchangeOptions) => {
+      const { pastedRedirectUrl = '', ...rest } = params ?? {};
+      return await exchangeUnisTicketIamFromRedirectUrl(pastedRedirectUrl, rest);
+    },
+  );
+
+  ipcMain.handle('skill:cancelUnisIamLogin', async () => {
+    cancelUnisIamLogin();
+    return { success: true };
   });
 }
 

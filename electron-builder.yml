@@ -4,6 +4,12 @@ copyright: Copyright © 2026 ItemClaw
 compression: maximum
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
+# Deep links (legacy Staff IAM: itemclaw://unis-iam/callback?code=…&state=… — paste URL is preferred)
+protocols:
+  - name: ItemClaw
+    schemes:
+      - itemclaw
+
 directories:
   output: release
   buildResources: resources

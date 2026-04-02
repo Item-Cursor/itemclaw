@@ -1,16 +1,20 @@
 /**
  * Unis Ticket skill flyout.
- * Shows an email + password sign-in form and stores the session token as apiKey.
+ * Email + password sign-in, or Staff IAM (embedded window captures OAuth, or system browser + paste URL).
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { invokeIpc } from '@/lib/api-client';
-import { loginUnisTicket, validateUnisTicketSession } from '@/lib/unis-ticket';
+import {
+  loginUnisTicket,
+  validateUnisTicketSession,
+} from '@/lib/unis-ticket';
 import { useSkillsStore } from '@/stores/skills';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -32,11 +36,146 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
   const { fetchSkills } = useSkillsStore();
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [iamLoginUrlOverride, setIamLoginUrlOverride] = useState('');
+  const [iamProgressNote, setIamProgressNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [iamBusy, setIamBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const isConnected = !!skill?.config?.apiKey;
+
+  const persistUnisSession = useCallback(
+    async (resolvedSessionToken: string, resolvedIamToken: string) => {
+      if (!skill) return;
+      const result = await invokeIpc<{ success: boolean; error?: string }>(
+        'skill:updateConfig',
+        {
+          skillKey: skill.id,
+          apiKey: resolvedSessionToken,
+          env: {
+            [UNIS_TICKET_TOKEN_ENV_KEY]: resolvedSessionToken,
+            [IAM_CLIENT_CREDENTIAL_TOKEN_ENV_KEY]: resolvedIamToken,
+          },
+        },
+      ) as { success: boolean; error?: string };
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save token');
+      }
+
+      if (!skill.enabled) {
+        onToggle(true);
+      }
+
+      await fetchSkills();
+      setSuccess(true);
+      toast.success(`${skill.name} connected successfully`);
+    },
+    [fetchSkills, onToggle, skill],
+  );
+
+  const completeUnisIamExchange = useCallback(
+    async (
+      pastedRedirectUrl: string,
+      progressTransport: 'paste' | 'embedded',
+    ) => {
+      if (!skill) return;
+      const pasted = pastedRedirectUrl.trim();
+      if (!pasted) {
+        setError(
+          progressTransport === 'embedded'
+            ? 'Embedded sign-in did not return a callback URL.'
+            : 'Paste the full URL from the address bar after IAM redirects (includes code and state).',
+        );
+        return;
+      }
+      setIamBusy(true);
+      setError(null);
+      setSuccess(false);
+      if (progressTransport === 'paste') {
+        setIamProgressNote(null);
+      }
+      try {
+        const loginResult = await invokeIpc<{
+          ok: boolean;
+          token?: string;
+          iamToken?: string;
+          error?: string;
+        }>('skill:unisIamExchange', {
+          pastedRedirectUrl: pasted,
+          progressTransport,
+        });
+
+        if (!loginResult.ok || (!loginResult.token && !loginResult.iamToken)) {
+          setError(loginResult.error ?? 'Staff IAM sign-in failed');
+          return;
+        }
+
+        const resolvedSessionToken = loginResult.token || loginResult.iamToken;
+        const resolvedIamToken = loginResult.iamToken || loginResult.token;
+        if (!resolvedSessionToken || !resolvedIamToken) {
+          setError('Missing session token from IAM response');
+          return;
+        }
+
+        const validated = await validateUnisTicketSession(resolvedSessionToken, {
+          iamBearerToken: resolvedIamToken,
+        });
+        if (!validated.ok) {
+          setError(
+            validated.error
+              ?? 'Session token was not accepted by Unis Ticket. Try again or use password sign-in.',
+          );
+          return;
+        }
+
+        await persistUnisSession(resolvedSessionToken, resolvedIamToken);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'IAM connection failed');
+      } finally {
+        setIamBusy(false);
+      }
+    },
+    [
+      persistUnisSession,
+      skill,
+    ],
+  );
+
+  useEffect(() => {
+    if (!isOpen || typeof window === 'undefined' || !window.electron?.ipcRenderer?.on) {
+      return undefined;
+    }
+    const unsub = window.electron.ipcRenderer.on('skill:unis-iam-progress', (...args: unknown[]) => {
+      const payload = args[0] as {
+        phase?: string;
+        transport?: string;
+        oauthError?: string;
+        hasAuthorizationCode?: boolean;
+        queryKeys?: string[];
+        callbackUrl?: string;
+      };
+      if (!payload?.phase) return;
+      if (payload.phase === 'callback-received') {
+        const parts = [
+          `IAM redirect (${payload.transport ?? '?'})`,
+          payload.oauthError ? `error: ${payload.oauthError}` : null,
+          `code present: ${payload.hasAuthorizationCode ? 'yes' : 'no'}`,
+          payload.queryKeys?.length ? `query: ${payload.queryKeys.join(', ')}` : null,
+        ].filter(Boolean);
+        setIamProgressNote(parts.join(' · '));
+      } else if (payload.phase === 'redirect-captured' && payload.callbackUrl) {
+        setIamProgressNote('OAuth callback captured — completing sign-in…');
+        void completeUnisIamExchange(payload.callbackUrl, 'embedded');
+      } else if (payload.phase === 'exchanging') {
+        setIamProgressNote(
+          'Exchanging authorization code with Unis Ticket…',
+        );
+      }
+    });
+    return () => unsub?.();
+  }, [completeUnisIamExchange, isOpen]);
 
   const handleSignIn = useCallback(async () => {
     if (!skill) return;
@@ -66,7 +205,9 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
         return;
       }
 
-      const validated = await validateUnisTicketSession(resolvedSessionToken);
+      const validated = await validateUnisTicketSession(resolvedSessionToken, {
+        iamBearerToken: resolvedIamToken,
+      });
       if (!validated.ok) {
         setError(
           validated.error
@@ -75,41 +216,55 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
         return;
       }
 
-      const result = await invokeIpc<{ success: boolean; error?: string }>(
-        'skill:updateConfig',
-        {
-          skillKey: skill.id,
-          apiKey: resolvedSessionToken,
-          env: {
-            [UNIS_TICKET_TOKEN_ENV_KEY]: resolvedSessionToken,
-            [IAM_CLIENT_CREDENTIAL_TOKEN_ENV_KEY]: resolvedIamToken,
-          },
-        },
-      ) as { success: boolean; error?: string };
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to save token');
-      }
-
-      if (!skill.enabled) {
-        onToggle(true);
-      }
-
-      await fetchSkills();
-      setSuccess(true);
+      await persistUnisSession(resolvedSessionToken, resolvedIamToken);
       setPassword('');
-      toast.success(`${skill.name} connected successfully`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connection failed');
     } finally {
       setBusy(false);
     }
-  }, [emailOrUsername, fetchSkills, onToggle, password, skill]);
+  }, [emailOrUsername, password, persistUnisSession, skill]);
+
+  const handleOpenUnisIamEmbedded = useCallback(async () => {
+    setError(null);
+    setIamProgressNote(null);
+    try {
+      const loginUrl = iamLoginUrlOverride.trim() || undefined;
+      const result = await invokeIpc<{ ok: boolean; error?: string }>(
+        'skill:openUnisIamLogin',
+        { mode: 'embedded', loginUrl },
+      );
+      if (!result.ok) {
+        setError(result.error ?? 'Could not open sign-in window');
+        return;
+      }
+      setIamProgressNote(
+        'Sign in inside the window. The app captures the OAuth callback before the page can clear it.',
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to open embedded IAM login');
+    }
+  }, [iamLoginUrlOverride]);
 
   if (!skill) return null;
 
+  const anyBusy = busy || iamBusy;
+
+  const closeSheet = () => {
+    void invokeIpc('skill:cancelUnisIamLogin');
+    onClose();
+  };
+
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Sheet
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          void invokeIpc('skill:cancelUnisIamLogin');
+          onClose();
+        }
+      }}
+    >
       <SheetContent
         className="w-full sm:max-w-[450px] p-0 flex flex-col border-l border-black/10 dark:border-white/10 bg-[#f3f1e9] dark:bg-[#1a1a19] shadow-[0_0_40px_rgba(0,0,0,0.2)]"
         side="right"
@@ -133,7 +288,38 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
             </p>
           </div>
 
-          <div className="space-y-7 px-1">
+          {skill.id === 'unis-ticket' && (
+            <details className="mb-6 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.05] px-3 py-2.5 mx-1">
+              <summary className="text-[12px] font-semibold text-foreground/80 cursor-pointer select-none">
+                Ticket &amp; messages API (for your agent)
+              </summary>
+              <div className="mt-3 space-y-2.5 text-[11px] text-foreground/65 leading-relaxed">
+                <p className="font-medium text-foreground/75">Base URL</p>
+                <p className="font-mono text-[10px] break-all pl-0.5">
+                  https://unisticket.item.com/api/item-tickets
+                </p>
+                <p className="font-medium text-foreground/75 pt-1">Resolve display ticket number to internal id</p>
+                <p className="font-mono text-[10px] break-all pl-0.5">
+                  GET /v1/staff/tickets/number/{'{code}'}
+                </p>
+                <p className="text-[10px] text-foreground/55">
+                  Headers: x-tickets-token ($UNIS_TICKET_TOKEN), X-Tenant-Id, and optional Accept-Language.
+                </p>
+                <p className="font-medium text-foreground/75 pt-1">Ticket timeline endpoint</p>
+                <p className="font-mono text-[10px] break-all pl-0.5">
+                  POST /v1/staff/tickets/{'{ticketId}'}/timeline
+                </p>
+                <p className="text-[10px] text-foreground/55 pl-0.5">
+                  JSON body: page, size, input. `input` is optional and can include type/types, sourceChannel, withReplyMessage, and UTC time ranges.
+                </p>
+                <p className="text-[10px] text-foreground/55 pt-1">
+                  Message type enums: 1 MESSAGE, 2 SYSTEM, 3 INTERNAL_NOTE, 4 SIDE_CONVERSATION, 5 REPLY, 6 ESCALATION.
+                </p>
+              </div>
+            </details>
+          )}
+
+          <div className="space-y-7 px-1 pb-6">
             {error && (
               <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-3 flex items-start gap-2.5">
                 <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
@@ -183,9 +369,56 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
               />
             </div>
 
+            <Button
+              onClick={handleSignIn}
+              className="w-full h-[42px] text-[13px] rounded-full font-semibold shadow-sm border border-transparent transition-all bg-primary hover:bg-primary/90 text-primary-foreground"
+              disabled={anyBusy || !emailOrUsername.trim() || !password}
+            >
+              {busy ? 'Signing in...' : isConnected ? 'Sign in again' : 'Sign in'}
+            </Button>
+
             <p className="text-[12px] text-foreground/50 font-medium">
               Your credentials are used to obtain a session token that is stored locally. The password is never stored.
             </p>
+
+            <Separator className="my-2 bg-black/10 dark:bg-white/10" />
+
+            <div className="space-y-3">
+              <p className="text-[13px] font-bold text-foreground/80">Staff IAM</p>
+              <p className="text-[12px] text-foreground/55 font-medium leading-relaxed">
+                Prefer <strong className="font-semibold text-foreground/70">Sign in in app window</strong>. ClawX
+                will capture the OAuth callback and complete sign-in automatically after you finish login in that window.
+              </p>
+              {iamProgressNote && (
+                <div className="rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.05] px-3 py-2">
+                  <p className="text-[11px] font-mono text-foreground/80 leading-relaxed break-words">
+                    {iamProgressNote}
+                  </p>
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="text-[13px] font-bold text-foreground/80">IAM login URL (optional)</label>
+                <Input
+                  type="text"
+                  value={iamLoginUrlOverride}
+                  onChange={(e) => setIamLoginUrlOverride(e.target.value)}
+                  placeholder="https://unisticket.item.com/agent/login"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  disabled={anyBusy}
+                  className="h-[44px] text-[13px] bg-[#eeece3] dark:bg-[#151514] border-black/10 dark:border-white/10 rounded-xl focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary shadow-sm transition-all text-foreground placeholder:text-foreground/40 font-mono text-[12px]"
+                />
+              </div>
+              <Button
+                type="button"
+                className="w-full h-[42px] text-[13px] rounded-full font-semibold"
+                disabled={anyBusy}
+                onClick={() => void handleOpenUnisIamEmbedded()}
+              >
+                Sign in in app window (recommended)
+              </Button>
+            </div>
 
             {isConnected && (
               <div className="flex items-center justify-between pt-2">
@@ -198,18 +431,11 @@ export function UnisTicketDialog({ skill, isOpen, onClose, onToggle }: Props) {
             )}
           </div>
 
-          <div className="pt-8 pb-4 flex items-center justify-center gap-4 w-full px-2 max-w-[340px] mx-auto">
-            <Button
-              onClick={handleSignIn}
-              className="flex-1 h-[42px] text-[13px] rounded-full font-semibold shadow-sm border border-transparent transition-all bg-primary hover:bg-primary/90 text-primary-foreground"
-              disabled={busy || !emailOrUsername.trim() || !password}
-            >
-              {busy ? 'Signing in...' : isConnected ? 'Sign in again' : 'Sign in'}
-            </Button>
+          <div className="pt-4 pb-4 flex items-center justify-center gap-4 w-full px-2 max-w-[340px] mx-auto">
             <Button
               variant="outline"
-              className="flex-1 h-[42px] text-[13px] rounded-full font-semibold shadow-sm bg-transparent border-black/20 dark:border-white/20 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-foreground/80 hover:text-foreground"
-              onClick={onClose}
+              className="w-full h-[42px] text-[13px] rounded-full font-semibold shadow-sm bg-transparent border-black/20 dark:border-white/20 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-foreground/80 hover:text-foreground"
+              onClick={closeSheet}
             >
               {t('detail.close', 'Close')}
             </Button>

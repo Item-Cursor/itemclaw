@@ -14,16 +14,18 @@ $TOKEN = $env:UNIS_TICKET_TOKEN
 if (-not $TOKEN) { throw 'UNIS_TICKET_TOKEN is not set' }
 
 if (-not $Date) { $Date = (Get-Date).ToString('MM/dd/yyyy') }
-$createStart = "$Date 00:00:00"
-$createEnd = "$Date 23:59:59"
+$updateStart = "$Date 00:00:00"
+$updateEnd = "$Date 23:59:59"
 
 $hAuth = @{
   'x-tickets-token'    = $TOKEN
+  'X-Tenant-Id'        = '1'
   'User-Agent'         = 'ItemClaw-TicketSkill/1.0'
   'x-tickets-timezone' = 'America/Los_Angeles'
 }
 $hPost = @{
   'x-tickets-token' = $TOKEN
+  'X-Tenant-Id'     = '1'
   'User-Agent'      = 'ItemClaw-TicketSkill/1.0'
   'Content-Type'    = 'application/json'
 }
@@ -37,15 +39,16 @@ switch ($Mode) {
     # Direct API filtering for current authenticated user
     $input.staffId = [int64]$auth.data.id
     $input.staffIds = @([int64]$auth.data.id)
-    $input.dateField = 1
-    $input.createTimeStart = $createStart
-    $input.createTimeEnd = $createEnd
+    # Default to updated/activity time instead of create time.
+    $input.dateField = 3
+    $input.updateTimeStart = $updateStart
+    $input.updateTimeEnd = $updateEnd
     $input.displayStatusSystemStatus = @(10,20)
   }
   'open-daily' {
-    $input.dateField = 1
-    $input.createTimeStart = $createStart
-    $input.createTimeEnd = $createEnd
+    $input.dateField = 3
+    $input.updateTimeStart = $updateStart
+    $input.updateTimeEnd = $updateEnd
     $input.displayStatusSystemStatus = @(10)
   }
   'dept-open-daily' {
@@ -56,9 +59,9 @@ switch ($Mode) {
       $deptIds = @($auth.data.accessibleDepartmentIds)
     }
     $input.departmentIds = $deptIds
-    $input.dateField = 1
-    $input.createTimeStart = $createStart
-    $input.createTimeEnd = $createEnd
+    $input.dateField = 3
+    $input.updateTimeStart = $updateStart
+    $input.updateTimeEnd = $updateEnd
     $input.displayStatusSystemStatus = @(10)
   }
 }

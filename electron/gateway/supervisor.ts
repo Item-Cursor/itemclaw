@@ -21,41 +21,66 @@ export function warmupManagedPythonReadiness(): void {
   });
 }
 
-export async function terminateOwnedGatewayProcess(child: Electron.UtilityProcess): Promise<void> {
-  let exited = false;
-
+async function windowsTaskkillTree(pid: number, force: boolean): Promise<void> {
+  const cp = await import('child_process');
+  const flags = force ? '/F ' : '';
   await new Promise<void>((resolve) => {
-    child.once('exit', () => {
-      exited = true;
-      resolve();
-    });
+    cp.exec(
+      `taskkill ${flags}/PID ${pid} /T`,
+      { timeout: force ? 15_000 : 10_000, windowsHide: true },
+      () => resolve(),
+    );
+  });
+}
 
-    const pid = child.pid;
-    logger.info(`Sending kill to Gateway process (pid=${pid ?? 'unknown'})`);
+/**
+ * Stop the managed Gateway UtilityProcess and any child processes it spawned.
+ * On Windows, `child.kill()` / `process.kill(pid)` only targets the root PID;
+ * OpenClaw may leave Python or other workers running unless the whole tree is
+ * terminated (`taskkill /T`), matching {@link terminateOrphanedProcessIds}.
+ */
+export async function terminateOwnedGatewayProcess(child: Electron.UtilityProcess): Promise<void> {
+  const pid = child.pid;
+  logger.info(`Sending kill to Gateway process (pid=${pid ?? 'unknown'})`);
+
+  const exitPromise = new Promise<void>((resolve) => {
+    child.once('exit', () => resolve());
+  });
+
+  try {
+    if (process.platform === 'win32' && pid != null) {
+      await windowsTaskkillTree(pid, false);
+    } else {
+      child.kill();
+    }
+  } catch {
     try {
       child.kill();
     } catch {
       // ignore if already exited
     }
+  }
 
-    const timeout = setTimeout(() => {
-      if (!exited) {
-        logger.warn(`Gateway did not exit in time, force-killing (pid=${pid ?? 'unknown'})`);
-        if (pid) {
-          try {
-            process.kill(pid, 'SIGKILL');
-          } catch {
-            // ignore
-          }
+  const outcome = await Promise.race([
+    exitPromise.then((): 'exited' => 'exited'),
+    new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), 5000)),
+  ]);
+
+  if (outcome === 'timeout') {
+    logger.warn(`Gateway did not exit in time, force-killing (pid=${pid ?? 'unknown'})`);
+    if (pid != null) {
+      try {
+        if (process.platform === 'win32') {
+          await windowsTaskkillTree(pid, true);
+        } else {
+          process.kill(pid, 'SIGKILL');
         }
+      } catch {
+        // ignore
       }
-      resolve();
-    }, 5000);
-
-    child.once('exit', () => {
-      clearTimeout(timeout);
-    });
-  });
+    }
+    await Promise.race([exitPromise, new Promise<void>((r) => setTimeout(r, 2000))]);
+  }
 }
 
 export async function unloadLaunchctlGatewayService(): Promise<void> {

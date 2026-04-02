@@ -24,6 +24,7 @@ metadata:
 ## Required headers
 
 - `x-tickets-token: $env:UNIS_TICKET_TOKEN`
+- `X-Tenant-Id: 1` (Unisco default unless your tenant differs)
 - `User-Agent: ItemClaw-TicketSkill/1.0`
 - `Content-Type: application/json` (POST)
 - `x-tickets-timezone: America/Los_Angeles` on `/auth/current`
@@ -46,7 +47,7 @@ Example commands:
 ## Flow
 
 1. `GET /auth/current` for identity context
-2. Build `input` filters (use direct `staffId`/`staffIds` for assigned-user mode; optional date/status scope)
+2. Build `input` filters (use direct `staffId`/`staffIds` for assigned-user mode; default to `dateField=3` with `updateTimeStart`/`updateTimeEnd`)
 3. `POST /tickets/page` using a **hard stop-gap cap**:
    - request only `page=1`, `size=100`
    - do not fetch additional pages in stop-gap mode
@@ -58,6 +59,7 @@ Example commands:
    - total, open, closed, overdue, SLA-breached
    - by status / priority / department
    - action queue priority: SLA-breached > overdue > open > newest update
+6. For any ticket-level analysis (summary, escalation notes, suggested reply), pull timeline via `POST /tickets/{ticketId}/timeline` before finalizing output.
 
 ## Request payload templates (stop-gap, max 100)
 
@@ -72,9 +74,9 @@ Use `input` object filters. Keep `size=100` and `page=1` for stop-gap mode.
   "input": {
     "staffId": 354064922684817408,
     "staffIds": [354064922684817408],
-    "dateField": 1,
-    "createTimeStart": "MM/DD/YYYY 00:00:00",
-    "createTimeEnd": "MM/DD/YYYY 23:59:59",
+    "dateField": 3,
+    "updateTimeStart": "MM/DD/YYYY 00:00:00",
+    "updateTimeEnd": "MM/DD/YYYY 23:59:59",
     "displayStatusSystemStatus": [10, 20]
   }
 }
@@ -87,9 +89,9 @@ Use `input` object filters. Keep `size=100` and `page=1` for stop-gap mode.
   "size": 100,
   "page": 1,
   "input": {
-    "dateField": 1,
-    "createTimeStart": "MM/DD/YYYY 00:00:00",
-    "createTimeEnd": "MM/DD/YYYY 23:59:59",
+    "dateField": 3,
+    "updateTimeStart": "MM/DD/YYYY 00:00:00",
+    "updateTimeEnd": "MM/DD/YYYY 23:59:59",
     "displayStatusSystemStatus": [10]
   }
 }
@@ -103,9 +105,9 @@ Use `input` object filters. Keep `size=100` and `page=1` for stop-gap mode.
   "page": 1,
   "input": {
     "departmentIds": [4, 316285263552864256],
-    "dateField": 1,
-    "createTimeStart": "MM/DD/YYYY 00:00:00",
-    "createTimeEnd": "MM/DD/YYYY 23:59:59",
+    "dateField": 3,
+    "updateTimeStart": "MM/DD/YYYY 00:00:00",
+    "updateTimeEnd": "MM/DD/YYYY 23:59:59",
     "displayStatusSystemStatus": [10]
   }
 }
@@ -117,6 +119,25 @@ Use `input` object filters. Keep `size=100` and `page=1` for stop-gap mode.
 - Stop-gap mode should not paginate beyond page 1.
 - If `response.data.total > 100`, record that in notes but only process returned records.
 - Prefer direct API assignee filters (`staffId` + `staffIds`) for assigned-user correctness.
+
+## Ticket timeline drill-down (required for ticket-level insights)
+
+Use timeline for per-ticket narrative context instead of guessing from the list row.
+
+- Endpoint: `POST /tickets/{ticketId}/timeline`
+- Body shape:
+
+```json
+{
+  "page": 1,
+  "size": 20,
+  "input": {}
+}
+```
+
+- Optional `input` filters: `type`, `types`, `sourceChannel`, `excludeMessageId`, `withReplyMessage`, `createTimeStart`, `createTimeEnd`, `updateTimeStart`, `updateTimeEnd`
+- Message type enum: `1` MESSAGE, `2` SYSTEM, `3` INTERNAL_NOTE, `4` SIDE_CONVERSATION, `5` REPLY, `6` ESCALATION
+- All timeline timestamps are UTC `MM/dd/yyyy HH:mm:ss`; convert to user timezone for display
 
 ## Deterministic output format
 

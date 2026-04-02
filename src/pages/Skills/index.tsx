@@ -43,13 +43,14 @@ const SPECIAL_UNIS_LOGIN_SKILLS = [
   {
     id: 'unis-ticket',
     name: 'Unis Ticket',
-    description: 'Query, search, and manage tickets in Unis Ticket via your AI agent.',
+    description:
+      'Query and manage tickets; resolve a ticket number, then fetch thread items via `POST /v1/staff/tickets/{ticketId}/timeline`.',
   },
   {
     id: 'unis-ticket-reporting',
     name: 'Unis Ticket Reporting',
     description:
-      'Run daily KPI reports and prioritized action queues (assigned-to-me, all open, or department-scoped) via run-report.ps1.',
+      'Run daily KPI reports and prioritized action queues (assigned-to-me, all open, or department-scoped), with timeline drill-down support.',
   },
 ] as const;
 const UNIS_LOGIN_SKILL_IDS = SPECIAL_UNIS_LOGIN_SKILLS.map((s) => s.id);
