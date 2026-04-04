@@ -5,7 +5,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Search, X, AlertCircle, Ticket, RefreshCw, Plus,
-  MessageSquareText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +16,7 @@ import { useChatStore } from '@/stores/chat';
 import { useNavigate } from 'react-router-dom';
 import { TicketDetailSheet } from './TicketDetailSheet';
 import { CreateTicketDialog } from './CreateTicketDialog';
+import { ReportsDashboard } from './ReportsDashboard';
 import { UnisTicketIcon } from '@/components/skills/UnisTicketIcon';
 
 function getTicketTitle(t: { subject?: string; title?: string }): string {
@@ -63,7 +63,7 @@ export function Tickets() {
   const newSession = useChatStore((s) => s.newSession);
   const {
     authenticated, authChecked, currentStaffName,
-    statusReport, activityReport, reportLoading,
+    activityReport, reportLoading,
     tickets, ticketsTotal, ticketsPage, ticketsLoading,
     scope, departments, selectedDepartmentId,
     searchQuery, searchResults, searching,
@@ -159,8 +159,7 @@ export function Tickets() {
                 )}
               </div>
               {scope === 'department' && !showSearchResults && departments.length > 0 && (
-                <select value={selectedDepartmentId ?? ''} onChange={(e) => setSelectedDepartmentId(e.target.value ? Number(e.target.value) : null)} className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-2 text-foreground outline-none">
-                  <option value="">{t('scope.allMyDepts')}</option>
+                <select value={selectedDepartmentId ?? departments[0]?.id ?? ''} onChange={(e) => setSelectedDepartmentId(e.target.value ? Number(e.target.value) : null)} className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-2 text-foreground outline-none appearance-none">
                   {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               )}
@@ -202,143 +201,24 @@ export function Tickets() {
                 )
 
               ) : scope === 'reports' ? (
-                /* ── Reports View ── */
-                <div className="space-y-6">
-                  {/* Report filters */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <select
-                      value={reportFilter === 'my' ? 'my' : String(reportFilter)}
-                      onChange={(e) => setReportFilter(e.target.value === 'my' ? 'my' : Number(e.target.value))}
-                      className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium"
-                    >
-                      <option value="my">{t('scope.my')} (personal)</option>
-                      {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
-                    <select
-                      value={reportDateRange}
-                      onChange={(e) => setReportDateRange(e.target.value as 'week' | 'month' | '3months' | '6months' | 'year')}
-                      className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium"
-                    >
-                      <option value="week">Last 7 days</option>
-                      <option value="month">Last 30 days</option>
-                      <option value="3months">Last 3 months</option>
-                      <option value="6months">Last 6 months</option>
-                      <option value="year">Last 12 months</option>
-                    </select>
-                    <div className="flex items-center rounded-lg border border-black/10 dark:border-white/10 overflow-hidden">
-                      {(['status', 'activity'] as const).map(rt => (
-                        <button key={rt} onClick={() => setReportType(rt)} className={cn('h-8 px-3 text-[13px] font-medium transition-colors', reportType === rt ? 'bg-foreground text-background' : 'bg-black/5 dark:bg-white/5 text-foreground/60 hover:text-foreground')}>
-                          {rt === 'status' ? 'Status' : 'Activity'}
-                        </button>
-                      ))}
-                    </div>
-                    {reportFilter !== 'my' && (
-                      <select
-                        value={reportGroupBy}
-                        onChange={(e) => setReportGroupBy(Number(e.target.value))}
-                        className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium"
-                      >
-                        <option value={1}>By Department</option>
-                        <option value={3}>By Staff (in Dept)</option>
-                        <option value={2}>By Team</option>
-                        <option value={4}>By Staff (in Team)</option>
-                      </select>
-                    )}
-                  </div>
-
-                  {/* Report table */}
-                  {reportLoading ? <div className="flex justify-center py-6"><LoadingSpinner size="sm" /></div> : reportType === 'status' && statusReport.length > 0 ? (
-                    <div className="rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/5 overflow-hidden">
-                      <div className="px-5 py-3 border-b border-black/5 dark:border-white/5">
-                        <h3 className="text-[14px] font-semibold text-foreground">Status Breakdown</h3>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-[13px]">
-                          <thead>
-                            <tr className="border-b border-black/5 dark:border-white/5">
-                              <th className="text-left px-5 py-2.5 text-foreground/50 font-medium">{reportFilter === 'my' ? 'Staff' : reportGroupBy <= 2 ? 'Group' : 'Staff'}</th>
-                              {statusReport[0]?.statusCounts && Object.keys(statusReport[0].statusCounts).map(status => (
-                                <th key={status} className="text-right px-4 py-2.5 text-foreground/50 font-medium">{status}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {statusReport.map((row, i) => (
-                              <tr key={i} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                                <td className="px-5 py-2.5 text-foreground font-medium">{row.staffName || row.department || row.team || '—'}</td>
-                                {row.statusCounts && Object.values(row.statusCounts).map((count, j) => (
-                                  <td key={j} className="text-right px-4 py-2.5 text-foreground tabular-nums">{count}</td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ) : reportType === 'activity' && activityReport.length > 0 ? (
-                    <div className="rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/5 overflow-hidden">
-                      <div className="px-5 py-3 border-b border-black/5 dark:border-white/5">
-                        <h3 className="text-[14px] font-semibold text-foreground">Activity</h3>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-[13px]">
-                          <thead>
-                            <tr className="border-b border-black/5 dark:border-white/5">
-                              <th className="text-left px-5 py-2.5 text-foreground/50 font-medium">{reportFilter === 'my' ? 'Staff' : reportGroupBy <= 2 ? 'Group' : 'Staff'}</th>
-                              <th className="text-right px-4 py-2.5 text-foreground/50 font-medium">Processed</th>
-                              <th className="text-right px-4 py-2.5 text-foreground/50 font-medium">Solved</th>
-                              <th className="text-right px-4 py-2.5 text-foreground/50 font-medium">Replies</th>
-                              <th className="text-right px-4 py-2.5 text-foreground/50 font-medium">Notes</th>
-                              <th className="text-right px-4 py-2.5 text-foreground/50 font-medium">Avg 1st Reply</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {activityReport.map((row, i) => (
-                              <tr key={i} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                                <td className="px-5 py-2.5 text-foreground font-medium">{row.staffName || row.department || '—'}</td>
-                                <td className="text-right px-4 py-2.5 text-foreground tabular-nums">{row.processedTickets ?? 0}</td>
-                                <td className="text-right px-4 py-2.5 text-foreground tabular-nums">{row.solvedTickets ?? 0}</td>
-                                <td className="text-right px-4 py-2.5 text-foreground tabular-nums">{row.publicReply ?? 0}</td>
-                                <td className="text-right px-4 py-2.5 text-foreground tabular-nums">{row.internalNote ?? 0}</td>
-                                <td className="text-right px-4 py-2.5 text-foreground tabular-nums">{row.firstReplyTime != null ? `${Math.round(row.firstReplyTime / 60)}m` : '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ) : <div className="flex flex-col items-center justify-center py-12 text-muted-foreground"><p className="text-[13px]">No report data for this selection</p></div>}
-
-                  {/* AI Summary — this is where AI shines */}
-                  <div className="rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/5 p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><MessageSquareText className="h-5 w-5 text-primary" /></div>
-                      <div>
-                        <h3 className="text-[15px] font-semibold text-foreground">{t('aiSummary')}</h3>
-                        <p className="text-[12px] text-foreground/50">
-                          {reportFilter === 'my' ? 'Ask AI for deeper insights on your workload' : `Ask AI for manager insights on ${departments.find(d => d.id === reportFilter)?.name || 'department'}`}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button onClick={() => handleAskAI()} className="px-4 py-2 rounded-full border border-black/10 dark:border-white/10 text-[13px] font-medium text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                        Summarize {reportFilter === 'my' ? 'my workload' : 'this department'}
-                      </button>
-                      <button onClick={() => { newSession(); navigate('/'); setTimeout(() => sendMessage(`🎫 What are the most overdue tickets for ${reportContext} this week? Rank them by how overdue they are and suggest next steps.`), 300); }} className="px-4 py-2 rounded-full border border-black/10 dark:border-white/10 text-[13px] font-medium text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                        Most overdue this week
-                      </button>
-                      <button onClick={() => { newSession(); navigate('/'); setTimeout(() => sendMessage(`🎫 For ${reportContext}, what trends do you see? Are things getting better or worse? What should I focus on?`), 300); }} className="px-4 py-2 rounded-full border border-black/10 dark:border-white/10 text-[13px] font-medium text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                        Trend analysis
-                      </button>
-                      <button onClick={() => { newSession(); navigate('/'); setTimeout(() => sendMessage(`🎫 Show me the SLA performance for ${reportContext} this week and suggest improvements`), 300); }} className="px-4 py-2 rounded-full border border-black/10 dark:border-white/10 text-[13px] font-medium text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                        SLA performance
-                      </button>
-                      <button onClick={() => { newSession(); navigate('/'); setTimeout(() => sendMessage(`🎫 Which tickets in ${reportContext} need attention today? Prioritize by urgency and SLA deadline.`), 300); }} className="px-4 py-2 rounded-full border border-black/10 dark:border-white/10 text-[13px] font-medium text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                        What needs attention?
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                /* ── Reports Dashboard View ── */
+                <ReportsDashboard
+                  departments={departments}
+                  reportFilter={reportFilter}
+                  reportDateRange={reportDateRange}
+                  reportGroupBy={reportGroupBy}
+                  reportType={reportType}
+                  reportLoading={reportLoading}
+                  activityReport={activityReport}
+                  stats={useTicketsStore.getState().stats}
+                  setReportFilter={setReportFilter}
+                  setReportDateRange={setReportDateRange}
+                  setReportGroupBy={setReportGroupBy}
+                  setReportType={setReportType}
+                  handleAskAI={handleAskAI}
+                  reportContext={reportContext}
+                  onAskAICustom={(prompt: string) => { newSession(); navigate('/'); setTimeout(() => sendMessage(prompt), 300); }}
+                />
 
               ) : (
                 /* ── Ticket List (My Tickets / Department) ── */

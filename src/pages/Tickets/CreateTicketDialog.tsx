@@ -47,7 +47,11 @@ export function CreateTicketDialog({ open, onClose }: { open: boolean; onClose: 
       setPriorities((priorityRes.records || []) as Option[]);
       const s = (statusRes.records || []) as Option[];
       setDisplayStatuses(s);
-      if (s.length > 0 && !displayStatusId) setDisplayStatusId(s[0].id);
+      // Default to "New" status for new tickets
+      if (s.length > 0 && !displayStatusId) {
+        const newStatus = s.find(st => st.name.toLowerCase() === 'new');
+        setDisplayStatusId(newStatus?.id ?? s[0].id);
+      }
     } catch { /* selectors will be empty */ }
   }, [displayStatusId]);
 

@@ -39,7 +39,7 @@ interface TicketsState {
   statusReport: TicketStatusReportDto[];
   activityReport: TicketActivityReportDto[];
   reportLoading: boolean;
-  reportDateRange: 'week' | 'month' | '3months' | '6months' | 'year';
+  reportDateRange: 'today' | 'week' | 'month' | '3months' | 'thisMonth' | '6months' | 'year';
   reportGroupBy: number; // 1=Dept, 2=Team, 3=DeptStaff, 4=TeamStaff, 5=Staff
   reportType: 'status' | 'activity' | 'sla';
 
@@ -73,7 +73,7 @@ interface TicketsState {
   setScope: (scope: TicketScope) => void;
   setSelectedDepartmentId: (id: number | null) => void;
   setReportFilter: (filter: 'my' | number) => void;
-  setReportDateRange: (range: 'week' | 'month' | '3months' | '6months' | 'year') => void;
+  setReportDateRange: (range: 'today' | 'week' | 'month' | '3months' | 'thisMonth' | '6months' | 'year') => void;
   setReportGroupBy: (groupBy: number) => void;
   setReportType: (type: 'status' | 'activity' | 'sla') => void;
   setSearchQuery: (query: string) => void;
@@ -212,6 +212,7 @@ export const useTicketsStore = create<TicketsState>((set, get) => ({
       const { currentStaffId, selectedDepartmentId, userDepartmentIds } = get();
       const input: Record<string, unknown> = {
         displayStatusSystemStatus: [10], // 10=open only, exclude closed/archived/deleted
+        ticketIsOverdue: false, // explicitly override — never inherit filter from web session
       };
       if (scope === 'my' && currentStaffId) {
         input.staffId = currentStaffId;
@@ -233,7 +234,13 @@ export const useTicketsStore = create<TicketsState>((set, get) => ({
   },
 
   setScope: (scope) => {
-    set({ scope, tickets: [], ticketsPage: 1 });
+    const { departments, selectedDepartmentId } = get();
+    // Auto-select first department when switching to department scope
+    if (scope === 'department' && !selectedDepartmentId && departments.length > 0) {
+      set({ scope, selectedDepartmentId: departments[0].id, tickets: [], ticketsPage: 1 });
+    } else {
+      set({ scope, tickets: [], ticketsPage: 1 });
+    }
     get().fetchTickets(1);
   },
 

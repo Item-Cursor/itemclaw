@@ -19,6 +19,19 @@ function formatDate(dateStr?: string): string {
   return new Date(dateStr).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+/** Strip HTML tags and decode entities to plain text */
+function stripHtml(html?: string): string {
+  if (!html) return '';
+  // Use DOMParser to safely extract text content
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent?.trim() || '';
+  } catch {
+    // Fallback: regex strip
+    return html.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, ' ').trim();
+  }
+}
+
 // Message type: 1=message, 2=system, 3=internal_note, 5=reply
 // User type: 1=customer, 2=staff, 3=system
 function TimelineItem({ item }: { item: TicketTimelineItemDTO }) {
@@ -47,7 +60,7 @@ function TimelineItem({ item }: { item: TicketTimelineItemDTO }) {
     return (
       <div className="flex justify-center py-2">
         <p className="text-[11px] text-foreground/40 font-medium text-center max-w-sm">
-          {msg.content || 'System message'}
+          {stripHtml(msg.content) || 'System message'}
           <span className="ml-2 opacity-60">{formatDate(msg.createTime || item.createTime)}</span>
         </p>
       </div>
@@ -74,7 +87,7 @@ function TimelineItem({ item }: { item: TicketTimelineItemDTO }) {
           <span className="text-[10px] text-foreground/40">{formatDate(msg.createTime || item.createTime)}</span>
         </div>
         <div className="text-[13px] text-foreground/80 leading-relaxed whitespace-pre-wrap break-words">
-          {msg.content || ''}
+          {stripHtml(msg.content)}
         </div>
       </div>
     </div>
@@ -85,9 +98,10 @@ function TimelineItem({ item }: { item: TicketTimelineItemDTO }) {
 
 function ReplyInput() {
   const { t } = useTranslation('tickets');
-  const { replying, replyToTicket } = useTicketsStore();
+  const { replying, replyToTicket, selectedTicket } = useTicketsStore();
   const [content, setContent] = useState('');
   const [isNote, setIsNote] = useState(false);
+  const [drafting, setDrafting] = useState(false);
 
   const handleSend = async () => {
     if (!content.trim() || replying) return;
@@ -95,6 +109,23 @@ function ReplyInput() {
       await replyToTicket({ content: content.trim(), isInternalNote: isNote });
       setContent('');
     } catch { /* error handled by store */ }
+  };
+
+  const handleAiDraft = async () => {
+    if (!selectedTicket || drafting) return;
+    setDrafting(true);
+    try {
+      const summary = await import('@/lib/unis-ticket-api').then(m => m.fetchTicketSummary(selectedTicket.id));
+      if (summary?.summary) {
+        setContent(summary.summary);
+      }
+    } catch {
+      // Fallback: build a basic draft from ticket context
+      const title = selectedTicket.title || selectedTicket.ticketNumber || '';
+      setContent(`Thank you for reaching out regarding "${title}". I've reviewed the details and `);
+    } finally {
+      setDrafting(false);
+    }
   };
 
   return (
@@ -114,12 +145,18 @@ function ReplyInput() {
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend(); }}
       />
       <div className="flex items-center justify-between mt-2">
-        <button onClick={() => setIsNote(!isNote)} className={cn(
-          'text-[12px] font-medium px-3 py-1 rounded-full transition-colors',
-          isNote ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' : 'bg-black/5 dark:bg-white/5 text-foreground/60 hover:text-foreground',
-        )}>
-          {isNote ? t('detail.internalNote') : t('detail.reply')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setIsNote(!isNote)} className={cn(
+            'text-[12px] font-medium px-3 py-1 rounded-full transition-colors',
+            isNote ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' : 'bg-black/5 dark:bg-white/5 text-foreground/60 hover:text-foreground',
+          )}>
+            {isNote ? t('detail.internalNote') : t('detail.reply')}
+          </button>
+          <button onClick={handleAiDraft} disabled={drafting} className="text-[12px] font-medium px-3 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 flex items-center gap-1">
+            {drafting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bot className="h-3 w-3" />}
+            Ask AI to Draft
+          </button>
+        </div>
         <Button size="sm" onClick={handleSend} disabled={!content.trim() || replying} className="h-8 px-4 rounded-full text-[12px] font-semibold gap-1.5 bg-[#0a84ff] hover:bg-[#007aff] text-white shadow-none">
           {replying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
           {t('detail.sendReply')}

@@ -82,41 +82,48 @@ export async function fetchCurrentUser(): Promise<CurrentStaffDetail> {
 // ── Date helpers (API uses MM/dd/yyyy HH:mm:ss in UTC) ──────────
 
 function formatApiDate(d: Date): string {
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  const yyyy = d.getUTCFullYear();
-  const hh = String(d.getUTCHours()).padStart(2, '0');
-  const mi = String(d.getUTCMinutes()).padStart(2, '0');
-  const ss = String(d.getUTCSeconds()).padStart(2, '0');
+  // Format using LOCAL time components — the backend parses as UTC
+  // but adjusts using the x-tickets-timezone header (same as item-tickets-web)
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
   return `${mm}/${dd}/${yyyy} ${hh}:${mi}:${ss}`;
 }
 
 function dateRange(months: number): { startDate: string; endDate: string } {
   const now = new Date();
-  const start = new Date(now);
-  start.setUTCMonth(start.getUTCMonth() - months);
-  start.setUTCHours(0, 0, 0, 0);
-  return { startDate: formatApiDate(start), endDate: formatApiDate(now) };
+  const start = new Date(now.getFullYear(), now.getMonth() - months, now.getDate(), 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  return { startDate: formatApiDate(start), endDate: formatApiDate(end) };
 }
 
-type DateRangeKey = 'week' | 'month' | '3months' | '6months' | 'year';
-const DATE_RANGE_MONTHS: Record<DateRangeKey, number> = {
-  week: 0, // special case
-  month: 1,
-  '3months': 3,
-  '6months': 6,
-  year: 12,
-};
+type DateRangeKey = 'today' | 'week' | 'month' | '3months' | 'thisMonth' | '6months' | 'year';
 
 function resolveDateRange(key: DateRangeKey): { startDate: string; endDate: string } {
-  if (key === 'week') {
-    const now = new Date();
-    const start = new Date(now);
-    start.setUTCDate(start.getUTCDate() - 7);
-    start.setUTCHours(0, 0, 0, 0);
-    return { startDate: formatApiDate(start), endDate: formatApiDate(now) };
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  const endDate = formatApiDate(end);
+
+  if (key === 'today') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    return { startDate: formatApiDate(start), endDate };
   }
-  return dateRange(DATE_RANGE_MONTHS[key]);
+  if (key === 'week') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0);
+    return { startDate: formatApiDate(start), endDate };
+  }
+  if (key === 'thisMonth') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    return { startDate: formatApiDate(start), endDate };
+  }
+  if (key === 'month') return dateRange(1);
+  if (key === '3months') return dateRange(3);
+  if (key === '6months') return dateRange(6);
+  if (key === 'year') return dateRange(12);
+  return dateRange(1);
 }
 
 /** Last 12 months (LTM) range for reports */
@@ -142,6 +149,27 @@ export async function fetchTicketCountStats(params?: {
   );
 }
 
+/** Count stats with explicit date range + team filter */
+export async function fetchTicketCountStatsFiltered(params: {
+  departmentIds?: number[];
+  teamIds?: number[];
+  dateRange?: DateRangeKey;
+}): Promise<TicketCountStatsDto> {
+  const { startDate, endDate } = resolveDateRange(params.dateRange ?? 'month');
+  return apiFetch<TicketCountStatsDto>(
+    '/v1/staff/dashboard/ticket/count-stats',
+    {
+      method: 'POST',
+      body: {
+        startDate,
+        endDate,
+        ...(params.departmentIds?.length ? { departmentIds: params.departmentIds } : {}),
+        ...(params.teamIds?.length ? { teamIds: params.teamIds } : {}),
+      },
+    },
+  );
+}
+
 // ── Ticket List ─────────────────────────────────────────────────
 
 export async function fetchTicketPage(params: {
@@ -151,6 +179,7 @@ export async function fetchTicketPage(params: {
     staffId?: number;
     departmentIds?: number[];
     displayStatusIds?: number[];
+    displayStatusSystemStatus?: number[];
     ticketIsOverdue?: boolean;
     title?: string;
   };
@@ -163,6 +192,7 @@ export async function fetchTicketPage(params: {
         page: params.page || 1,
         size: params.size || 20,
         input: params.input || {},
+        orders: [{ column: 'id', asc: false }],
       },
     },
   );
@@ -192,6 +222,12 @@ export async function searchTickets(params: {
 
 export async function fetchTicketDetail(id: number): Promise<TicketDetailDto> {
   return apiFetch<TicketDetailDto>(`/v1/staff/tickets/${id}`);
+}
+
+// ── Ticket AI Summary ───────────────────────────────────────────
+
+export async function fetchTicketSummary(ticketId: number): Promise<{ title?: string; summary?: string; insight?: string; key_points?: string[]; logic_flow?: string }> {
+  return apiFetch<{ title?: string; summary?: string; insight?: string; key_points?: string[]; logic_flow?: string }>(`/v1/staff/tickets/${ticketId}/summary`);
 }
 
 // ── Ticket Timeline ─────────────────────────────────────────────
@@ -328,12 +364,88 @@ export async function fetchDisplayStatuses(): Promise<PageOutDto<{ id: number; n
   );
 }
 
+// ── Teams ───────────────────────────────────────────────────────
+
+export async function fetchTeams(departmentIds?: number[]): Promise<PageOutDto<{ id: number; name: string }>> {
+  return apiFetch<PageOutDto<{ id: number; name: string }>>(
+    '/v1/staff/teams/page',
+    { method: 'POST', body: { page: 1, size: 200, input: { status: 1, ...(departmentIds?.length ? { departmentId: departmentIds[0] } : {}) } } },
+  );
+}
+
+// ── Personal ticket counts (by querying page with size=1 for total) ──
+
+export async function fetchPersonalTicketCount(staffId: number, extra: Record<string, unknown> = {}): Promise<number> {
+  const result = await apiFetch<PageOutDto<TicketDTO>>(
+    '/v1/staff/tickets/page',
+    { method: 'POST', body: { page: 1, size: 1, input: { staffId, displayStatusSystemStatus: [10], ...extra } } },
+  );
+  return result.total ?? 0;
+}
+
+export async function fetchFollowerTicketCount(staffId: number): Promise<number> {
+  const result = await apiFetch<PageOutDto<TicketDTO>>(
+    '/v1/staff/tickets/page',
+    { method: 'POST', body: { page: 1, size: 1, input: { followerIds: [staffId], displayStatusSystemStatus: [10] } } },
+  );
+  return result.total ?? 0;
+}
+
 // ── Customer Search ─────────────────────────────────────────────
 
 export async function searchCustomers(keyword: string): Promise<PageOutDto<{ id: number; name: string; email?: string }>> {
   return apiFetch<PageOutDto<{ id: number; name: string; email?: string }>>(
     '/v1/staff/customers/page',
     { method: 'POST', body: { page: 1, size: 20, input: { keyword, status: 1 } } },
+  );
+}
+
+// ── Dashboard APIs ──────────────────────────────────────────────
+
+export async function fetchTicketTrend(params: {
+  departmentIds?: number[];
+  dateRange?: DateRangeKey;
+}): Promise<{ date: string; count: number }[]> {
+  const { startDate, endDate } = resolveDateRange(params.dateRange ?? 'month');
+  return apiFetch<{ date: string; count: number }[]>(
+    '/v1/staff/dashboard/ticket/trend',
+    { method: 'POST', body: { startDate, endDate, departmentIds: params.departmentIds, trendDateField: 'createTime' } },
+  );
+}
+
+export async function fetchSlaAchievement(params: {
+  departmentIds?: number[];
+  teamIds?: number[];
+  dateRange?: DateRangeKey;
+}): Promise<{ departmentName: string; slaAchievementRate: number; ticketCount: number }[]> {
+  const { startDate, endDate } = resolveDateRange(params.dateRange ?? 'month');
+  return apiFetch<{ departmentName: string; slaAchievementRate: number; ticketCount: number }[]>(
+    '/v1/staff/dashboard/ticket/sla-achieved',
+    { method: 'POST', body: { startDate, endDate, departmentIds: params.departmentIds, teamIds: params.teamIds } },
+  );
+}
+
+
+export async function fetchTopTopics(params: {
+  departmentIds?: number[];
+  teamIds?: number[];
+  dateRange?: DateRangeKey;
+}): Promise<{ topicName: string; ticketCount: number }[]> {
+  const { startDate, endDate } = resolveDateRange(params.dateRange ?? 'month');
+  return apiFetch<{ topicName: string; ticketCount: number }[]>(
+    '/v1/staff/dashboard/ticket/topic-count',
+    { method: 'POST', body: { startDate, endDate, departmentIds: params.departmentIds, teamIds: params.teamIds } },
+  );
+}
+
+export async function fetchAvgResolutionTime(params: {
+  departmentIds?: number[];
+  dateRange?: DateRangeKey;
+}): Promise<{ departmentName: string; averageTimeToSolveHours: number; ticketCount: number }[]> {
+  const { startDate, endDate } = resolveDateRange(params.dateRange ?? 'month');
+  return apiFetch<{ departmentName: string; averageTimeToSolveHours: number; ticketCount: number }[]>(
+    '/v1/staff/dashboard/ticket/average-resolution-time',
+    { method: 'POST', body: { startDate, endDate, departmentIds: params.departmentIds } },
   );
 }
 
