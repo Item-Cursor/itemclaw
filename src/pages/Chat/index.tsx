@@ -190,7 +190,19 @@ export function Chat() {
 
 function WelcomeScreen() {
   const { t } = useTranslation('chat');
+  const sendMessage = useChatStore((s) => s.sendMessage);
+
+  const learnAboutMe = () => {
+    sendMessage(
+      `Analyze what's on my Desktop, Documents, and Downloads folders. Look at the file names, types, and any patterns you notice. ` +
+      `Then come up with personalized suggestions for how you can help me. For example, if you see a lot of Excel files ` +
+      `related to a topic, suggest how you could help with that. If you see project files, offer to help with those tasks. ` +
+      `Be specific about what you find and give me 3-5 actionable suggestions based on my actual files.`
+    );
+  };
+
   const quickActions = [
+    { key: 'learnAboutMe', label: '🧠 Learn about me', onClick: learnAboutMe },
     { key: 'askQuestions', label: t('welcome.askQuestions') },
     { key: 'creativeTasks', label: t('welcome.creativeTasks') },
     { key: 'brainstorming', label: t('welcome.brainstorming') },
@@ -203,9 +215,10 @@ function WelcomeScreen() {
       </h1>
 
       <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-lg w-full">
-        {quickActions.map(({ key, label }) => (
+        {quickActions.map(({ key, label, onClick }) => (
           <button 
             key={key}
+            onClick={onClick}
             className="px-4 py-1.5 rounded-full border border-black/10 dark:border-white/10 text-[13px] font-medium text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5 transition-colors bg-black/[0.02]"
           >
             {label}

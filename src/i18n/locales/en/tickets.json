@@ -1,0 +1,75 @@
+{
+  "title": "Tickets",
+  "subtitle": "Your ticket dashboard powered by AI",
+  "notConnected": "Connect to Unis Ticket to view your tickets",
+  "connectButton": "Connect Unis Ticket",
+  "stats": {
+    "new": "New",
+    "open": "Open",
+    "pending": "Pending",
+    "overdue": "Overdue",
+    "highPriority": "High Priority",
+    "unassigned": "Unassigned",
+    "avgResponse": "Avg Response"
+  },
+  "tabs": {
+    "all": "All",
+    "open": "Open",
+    "pending": "Pending",
+    "closed": "Closed"
+  },
+  "scope": {
+    "my": "My Tickets",
+    "department": "Department",
+    "reports": "Reports",
+    "allMyDepts": "All my departments"
+  },
+  "search": "Search tickets...",
+  "noTickets": "No tickets found",
+  "noTicketsSearch": "No tickets match your search",
+  "loadMore": "Load more",
+  "recentTickets": "Recent Tickets",
+  "aiSummary": "AI Summary",
+  "detail": {
+    "timeline": "Timeline",
+    "reply": "Reply",
+    "internalNote": "Internal Note",
+    "sendReply": "Send",
+    "sending": "Sending...",
+    "replyPlaceholder": "Type your reply...",
+    "notePlaceholder": "Type an internal note...",
+    "customer": "Customer",
+    "assignee": "Assignee",
+    "department": "Department",
+    "topic": "Topic",
+    "priority": "Priority",
+    "created": "Created",
+    "updated": "Updated",
+    "noTimeline": "No messages yet"
+  },
+  "create": {
+    "title": "Create Ticket",
+    "subject": "Subject",
+    "subjectPlaceholder": "Brief description of the issue",
+    "description": "Description",
+    "descriptionPlaceholder": "Detailed description...",
+    "topic": "Topic",
+    "priority": "Priority",
+    "department": "Department",
+    "selectTopic": "Select a topic",
+    "selectPriority": "Select a priority",
+    "selectDepartment": "Select a department",
+    "submit": "Create Ticket",
+    "creating": "Creating...",
+    "cancel": "Cancel",
+    "success": "Ticket created successfully"
+  },
+  "status": {
+    "open": "Open",
+    "pending": "Pending",
+    "closed": "Closed",
+    "resolved": "Resolved",
+    "overdue": "Overdue"
+  },
+  "minutes": "min"
+}
