@@ -1,6 +1,6 @@
 {
   "title": "Tickets",
-  "subtitle": "Your ticket dashboard powered by AI",
+  "subtitle": "ticket dashboard powered by AI",
   "notConnected": "Connect to Unis Ticket to view your tickets",
   "connectButton": "Connect Unis Ticket",
   "stats": {
@@ -22,7 +22,8 @@
     "my": "My Tickets",
     "department": "Department",
     "reports": "Reports",
-    "allMyDepts": "All my departments"
+    "allMyDepts": "All my departments",
+    "personal": "Personal Tickets"
   },
   "search": "Search tickets...",
   "noTickets": "No tickets found",

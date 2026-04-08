@@ -89,10 +89,10 @@ function AISummarySection({ isPersonal, handleAskAI, onAskAICustom, reportContex
       <div className="flex flex-wrap gap-2">
         {[
           { label: isPersonal ? 'Summarize my workload' : 'Summarize this department', prompt: '' },
-          { label: 'Overdue tickets today', prompt: `🎫 Show me all overdue tickets for ${reportContext} as of today. List them with ticket number, subject, how long overdue, and suggested next steps.` },
-          { label: 'Most overdue this week', prompt: `🎫 What are the most overdue tickets for ${reportContext} this week? Rank them by how overdue they are and suggest next steps.` },
-          { label: 'Trend analysis', prompt: `🎫 For ${reportContext}, what trends do you see? Are things getting better or worse? What should I focus on?` },
-          { label: 'SLA performance', prompt: `🎫 Show me the SLA performance for ${reportContext} this week and suggest improvements` },
+          { label: isPersonal ? 'Overdue tickets today' : 'Overdue tickets today for this department', prompt: `🎫 Show me all overdue tickets for ${reportContext} as of today. List them with ticket number, subject, how long overdue, and suggested next steps.` },
+          { label: isPersonal ? 'Most overdue this week' : 'Most overdue this week for this department', prompt: `🎫 What are the most overdue tickets for ${reportContext} this week? Rank them by how overdue they are and suggest next steps.` },
+          { label: isPersonal ? 'Trend analysis' : 'Trend analysis for the week for this department', prompt: `🎫 For ${reportContext}, what trends do you see? Are things getting better or worse? What should I focus on?` },
+          { label: isPersonal ? 'SLA performance' : 'SLA performance for this department', prompt: `🎫 Show me the SLA performance for ${reportContext} this week and suggest improvements` },
           { label: 'What needs attention?', prompt: `🎫 Which tickets in ${reportContext} need attention today? Prioritize by urgency and SLA deadline.` },
         ].map((q, i) => (
           <button key={i} onClick={() => q.prompt ? onAskAICustom(q.prompt) : handleAskAI()} className="px-4 py-2 rounded-full border border-black/10 dark:border-white/10 text-[13px] font-medium text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
@@ -154,7 +154,7 @@ function PersonalView({ handleAskAI, onAskAICustom }: { handleAskAI: () => void;
         <StatCard label="Open Tickets" value={counts.open ?? 0} icon={BarChart3} color="bg-green-500/10 text-green-500" loading={loading} />
         <StatCard label="Pending" value={counts.pending ?? 0} icon={Pause} color="bg-yellow-500/10 text-yellow-500" loading={loading} />
         <StatCard label="Hold" value={counts.hold ?? 0} icon={Hand} color="bg-orange-500/10 text-orange-500" loading={loading} />
-        <StatCard label="Following" value={counts.follower ?? 0} icon={Eye} color="bg-purple-500/10 text-purple-500" loading={loading} />
+        <StatCard label="Follower" value={counts.follower ?? 0} icon={Eye} color="bg-purple-500/10 text-purple-500" loading={loading} />
       </div>
       <AISummarySection isPersonal handleAskAI={handleAskAI} onAskAICustom={onAskAICustom} reportContext="my personal tickets (assigned to me)" deptName="" />
     </div>
@@ -164,30 +164,21 @@ function PersonalView({ handleAskAI, onAskAICustom }: { handleAskAI: () => void;
 // ── Department View ─────────────────────────────────────────────
 
 function DepartmentView({
-  departments, reportFilter, reportDateRange,
-  setReportDateRange,
+  departments, reportFilter, reportDateRange, appliedTeamIds,
   handleAskAI, reportContext, onAskAICustom,
-}: Pick<Props, 'departments' | 'reportFilter' | 'reportDateRange' | 'setReportDateRange' | 'handleAskAI' | 'reportContext' | 'onAskAICustom'>) {
+}: { departments: DepartmentOption[]; reportFilter: 'my' | number; reportDateRange: string; appliedTeamIds: number[]; handleAskAI: () => void; reportContext: string; onAskAICustom: (p: string) => void }) {
   const [topTopics, setTopTopics] = useState<{ topicName: string; ticketCount: number }[]>([]);
   const [slaData, setSlaData] = useState<{ departmentName: string; slaAchievementRate: number }[]>([]);
   const [localStats, setLocalStats] = useState<TicketCountStatsDto | null>(null);
-  const [teams, setTeams] = useState<{ id: number; name: string }[]>([]);
-  const [selectedTeamIds, setSelectedTeamIds] = useState<number[]>([]);
   const [dashLoading, setDashLoading] = useState(false);
 
   const deptIds = [reportFilter as number];
   const deptName = departments.find(d => d.id === reportFilter)?.name || 'department';
 
   useEffect(() => {
-    api.fetchTeams(deptIds).then(res => setTeams(res.records || [])).catch(() => setTeams([]));
-    setSelectedTeamIds([]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportFilter]);
-
-  useEffect(() => {
     let cancelled = false;
     setDashLoading(true);
-    const params = { departmentIds: deptIds, teamIds: selectedTeamIds.length ? selectedTeamIds : undefined, dateRange: reportDateRange as DateRangeKey };
+    const params = { departmentIds: deptIds, teamIds: appliedTeamIds.length ? appliedTeamIds : undefined, dateRange: reportDateRange as DateRangeKey };
     Promise.all([
       api.fetchTicketCountStatsFiltered(params).catch(() => null),
       api.fetchTopTopics(params).catch(() => []),
@@ -201,26 +192,13 @@ function DepartmentView({
     });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportFilter, reportDateRange, selectedTeamIds]);
+  }, [reportFilter, reportDateRange, appliedTeamIds]);
 
   const topTopicMax = Math.max(...topTopics.map(t => t.ticketCount), 1);
   const avgSla = slaData.length > 0 ? Math.round(slaData.reduce((s, d) => s + d.slaAchievementRate, 0) / slaData.length) : 0;
 
   return (
     <div className="space-y-6">
-      {/* Filters: Date Range + Team */}
-      <div className="flex flex-wrap items-center gap-3">
-        <select value={reportDateRange} onChange={(e) => setReportDateRange(e.target.value as DateRangeKey)} className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium">
-          {DATE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        {teams.length > 0 && (
-          <select value={selectedTeamIds[0] ?? ''} onChange={(e) => setSelectedTeamIds(e.target.value ? [Number(e.target.value)] : [])} className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium">
-            <option value="">All Teams</option>
-            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        )}
-      </div>
-
       {/* Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard label="New" value={localStats?.newTicketsCount ?? 0} icon={TrendingUp} color="bg-blue-500/10 text-blue-500" loading={dashLoading} />
@@ -266,17 +244,119 @@ function DepartmentView({
 
 export function ReportsDashboard(props: Props) {
   const isPersonal = props.reportFilter === 'my';
+
+  // Local pending state — nothing loads until user clicks Apply
+  const [pendingFilter, setPendingFilter] = useState<'my' | number>(props.reportFilter);
+  const [pendingDateRange, setPendingDateRange] = useState<'today' | 'week' | 'month' | '3months' | 'thisMonth' | '6months' | 'year'>(props.reportDateRange as 'today' | 'week' | 'month' | '3months' | 'thisMonth' | '6months' | 'year');
+  const [pendingTeamId, setPendingTeamId] = useState<number | null>(null);
+  const [appliedTeamIds, setAppliedTeamIds] = useState<number[]>([]);
+  const [teams, setTeams] = useState<{ id: number; name: string }[]>([]);
+  const pendingIsPersonal = pendingFilter === 'my';
+
+  // Sync pending state when props change externally
+  useEffect(() => { setPendingFilter(props.reportFilter); }, [props.reportFilter]);
+  useEffect(() => { setPendingDateRange(props.reportDateRange as typeof pendingDateRange); }, [props.reportDateRange]);
+
+  // Fetch teams when pending department changes
+  useEffect(() => {
+    if (pendingIsPersonal) { setTeams([]); return; }
+    const deptId = pendingFilter as number;
+    api.fetchTeams([deptId]).then(res => setTeams(res.records || [])).catch(() => setTeams([]));
+    setPendingTeamId(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingFilter, pendingIsPersonal]);
+
+  const pendingTeamIds = pendingTeamId ? [pendingTeamId] : [];
+  const isDirty = pendingFilter !== props.reportFilter
+    || pendingDateRange !== props.reportDateRange
+    || JSON.stringify(pendingTeamIds) !== JSON.stringify(appliedTeamIds);
+
+  const handleApply = () => {
+    if (pendingDateRange !== props.reportDateRange) {
+      props.setReportDateRange(pendingDateRange);
+    }
+    if (pendingFilter !== props.reportFilter) {
+      props.setReportFilter(pendingFilter);
+    }
+    setAppliedTeamIds(pendingTeamIds);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Toggle: Personal Tickets vs Department + Date Range + Apply */}
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={props.reportFilter === 'my' ? 'my' : String(props.reportFilter)}
-          onChange={(e) => props.setReportFilter(e.target.value === 'my' ? 'my' : Number(e.target.value))}
-          className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium"
+        <div className="flex items-center bg-black/5 dark:bg-white/5 rounded-full p-1">
+          <button
+            onClick={() => setPendingFilter('my')}
+            className={cn(
+              'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all',
+              pendingIsPersonal
+                ? 'bg-white dark:bg-white/10 text-foreground shadow-sm'
+                : 'text-foreground/60 hover:text-foreground'
+            )}
+          >
+            Personal Tickets
+          </button>
+          <button
+            onClick={() => {
+              if (props.departments.length > 0) {
+                const currentDeptId = typeof props.reportFilter === 'number' ? props.reportFilter : props.departments[0].id;
+                setPendingFilter(currentDeptId);
+              }
+            }}
+            className={cn(
+              'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all',
+              !pendingIsPersonal
+                ? 'bg-white dark:bg-white/10 text-foreground shadow-sm'
+                : 'text-foreground/60 hover:text-foreground'
+            )}
+          >
+            Department
+          </button>
+        </div>
+        {/* Department dropdown — only shown when not in personal mode */}
+        {!pendingIsPersonal && props.departments.length > 0 && (
+          <select
+            value={String(pendingFilter)}
+            onChange={(e) => setPendingFilter(Number(e.target.value))}
+            className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium"
+          >
+            {props.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        )}
+        {/* Date range — shown for department mode */}
+        {!pendingIsPersonal && (
+          <select
+            value={pendingDateRange}
+            onChange={(e) => setPendingDateRange(e.target.value as typeof pendingDateRange)}
+            className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium"
+          >
+            {DATE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        )}
+        {/* Team dropdown — shown for department mode when teams exist */}
+        {!pendingIsPersonal && teams.length > 0 && (
+          <select
+            value={pendingTeamId ?? ''}
+            onChange={(e) => setPendingTeamId(e.target.value ? Number(e.target.value) : null)}
+            className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium"
+          >
+            <option value="">All Teams</option>
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
+        <button
+          onClick={handleApply}
+          disabled={!isDirty}
+          className={cn(
+            'h-8 px-4 rounded-lg text-[13px] font-medium transition-all',
+            isDirty
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
+              : 'bg-black/5 dark:bg-white/5 text-foreground/30 cursor-not-allowed'
+          )}
         >
-          <option value="my">My Tickets (personal)</option>
-          {props.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
+          Apply
+        </button>
       </div>
       {isPersonal
         ? <PersonalView handleAskAI={() => props.handleAskAI()} onAskAICustom={props.onAskAICustom} />
@@ -284,7 +364,7 @@ export function ReportsDashboard(props: Props) {
             departments={props.departments}
             reportFilter={props.reportFilter}
             reportDateRange={props.reportDateRange}
-            setReportDateRange={props.setReportDateRange}
+            appliedTeamIds={appliedTeamIds}
             handleAskAI={() => props.handleAskAI()}
             reportContext={props.reportContext}
             onAskAICustom={props.onAskAICustom}

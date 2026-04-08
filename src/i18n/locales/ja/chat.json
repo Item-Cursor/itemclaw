@@ -5,11 +5,11 @@
         "title": "ItemClaw へようこそ",
         "subtitle": "お手伝いできることはありますか？",
         "firstTimeHint": "チケット機能を使うには、スキルページで Unis Ticket スキルを有効にし、トークンを設定してください。",
-        "askQuestions": "タスク対応",
-        "askQuestionsDesc": "タスク指向の依頼に対応します",
-        "creativeTasks": "連続実行",
-        "creativeTasksDesc": "複数ステップの作業を継続して進めます",
-        "brainstorming": "マルチエージェント並列実行"
+        "askQuestions": "📋 チケットを確認",
+        "askQuestionsDesc": "チケットキューを表示・管理",
+        "creativeTasks": "📊 レポートを表示",
+        "creativeTasksDesc": "チケット統計とパフォーマンスを確認",
+        "brainstorming": "💡 何ができますか？"
     },
     "noLogs": "（ログはまだありません）",
     "toolbar": {

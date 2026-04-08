@@ -13,7 +13,7 @@
     "avgResponse": "平均応答"
   },
   "tabs": { "all": "すべて", "open": "対応中", "pending": "保留中", "closed": "完了" },
-  "scope": { "my": "マイチケット", "department": "部門", "reports": "レポート", "allMyDepts": "全部門" },
+  "scope": { "my": "マイチケット", "department": "部門", "reports": "レポート", "allMyDepts": "全部門", "personal": "個人チケット" },
   "search": "チケットを検索...",
   "noTickets": "チケットがありません",
   "noTicketsSearch": "該当するチケットがありません",

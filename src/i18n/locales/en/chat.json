@@ -5,11 +5,11 @@
         "title": "Welcome to ItemClaw",
         "subtitle": "What can I do for you?",
         "firstTimeHint": "For ticket system features, enable the Unis Ticket skill in Skills and configure your token there.",
-        "askQuestions": "Handle Tasks",
-        "askQuestionsDesc": "Work on task-oriented requests",
-        "creativeTasks": "Continuous Execution",
-        "creativeTasksDesc": "Keep running through multi-step work",
-        "brainstorming": "Multi-Agent Parallel"
+        "askQuestions": "📋 Check my tickets",
+        "askQuestionsDesc": "View and manage your ticket queue",
+        "creativeTasks": "📊 Show my reports",
+        "creativeTasksDesc": "See ticket stats and performance",
+        "brainstorming": "💡 What can you do?"
     },
     "noLogs": "(No logs available yet)",
     "toolbar": {

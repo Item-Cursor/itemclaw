@@ -13,7 +13,7 @@
     "avgResponse": "平均响应"
   },
   "tabs": { "all": "全部", "open": "待处理", "pending": "等待中", "closed": "已关闭" },
-  "scope": { "my": "我的工单", "department": "部门", "reports": "报表", "allMyDepts": "我的所有部门" },
+  "scope": { "my": "我的工单", "department": "部门", "reports": "报表", "allMyDepts": "我的所有部门", "personal": "个人工单" },
   "search": "搜索工单...",
   "noTickets": "暂无工单",
   "noTicketsSearch": "没有匹配的工单",

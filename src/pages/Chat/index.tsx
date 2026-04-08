@@ -5,6 +5,7 @@
  * are in the toolbar; messages render with markdown + streaming.
  */
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { useChatStore, type RawMessage } from '@/stores/chat';
 import { useGatewayStore } from '@/stores/gateway';
@@ -13,6 +14,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { ChatToolbar } from './ChatToolbar';
+import { useTicketsStore } from '@/stores/tickets';
 import { extractImages, extractText, extractThinking, extractToolUse } from './message-utils';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -191,6 +193,7 @@ export function Chat() {
 function WelcomeScreen() {
   const { t } = useTranslation('chat');
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const navigate = useNavigate();
 
   const learnAboutMe = () => {
     sendMessage(
@@ -203,9 +206,13 @@ function WelcomeScreen() {
 
   const quickActions = [
     { key: 'learnAboutMe', label: '🧠 Learn about me', onClick: learnAboutMe },
-    { key: 'askQuestions', label: t('welcome.askQuestions') },
-    { key: 'creativeTasks', label: t('welcome.creativeTasks') },
-    { key: 'brainstorming', label: t('welcome.brainstorming') },
+    { key: 'askQuestions', label: t('welcome.askQuestions'), onClick: () => navigate('/tickets') },
+    { key: 'creativeTasks', label: t('welcome.creativeTasks'), onClick: () => {
+      const { departments, setReportFilter } = useTicketsStore.getState();
+      if (departments.length > 0) setReportFilter(departments[0].id);
+      navigate('/tickets');
+    }},
+    { key: 'brainstorming', label: t('welcome.brainstorming'), onClick: () => sendMessage('What can you help me with? Give me a quick overview of your capabilities and some examples of things I can ask you to do.') },
   ];
 
   return (
