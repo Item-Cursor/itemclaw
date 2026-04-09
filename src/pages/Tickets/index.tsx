@@ -55,7 +55,7 @@ export function Tickets() {
   // Build context-aware AI prompt based on current filter
   const reportContext = reportFilter === 'my'
     ? 'my personal tickets (assigned to me)'
-    : `the "${departments.find(d => d.id === reportFilter)?.name || 'selected'}" department tickets`;
+    : `the "${departments.find(d => String(d.id) === String(reportFilter))?.name || 'selected'}" department tickets`;
 
   const handleAskAI = useCallback((ticketNum?: string, title?: string) => {
     newSession();

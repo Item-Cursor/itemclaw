@@ -3,7 +3,7 @@
  * Personal: status cards (Wait Answer, New, Open, Pending, Hold, Following) + AI insights
  * Department: filters (dept, date range, team) + stat cards + top topics + SLA + AI insights
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   MessageSquareText, TrendingUp, Clock, AlertTriangle,
   Users, BarChart3, Mail, Inbox, Pause, Hand, Eye,
@@ -18,14 +18,14 @@ type DateRangeKey = 'today' | 'week' | 'month' | '3months' | 'thisMonth' | 'year
 
 interface Props {
   departments: DepartmentOption[];
-  reportFilter: 'my' | number;
+  reportFilter: 'my' | string;
   reportDateRange: string;
   reportGroupBy: number;
   reportType: string;
   reportLoading: boolean;
   activityReport: unknown[];
   stats: TicketCountStatsDto | null;
-  setReportFilter: (f: 'my' | number) => void;
+  setReportFilter: (f: 'my' | string) => void;
   setReportDateRange: (r: 'week' | 'month' | '3months' | '6months' | 'year' | 'today' | 'thisMonth') => void;
   setReportGroupBy: (g: number) => void;
   setReportType: (t: 'status' | 'activity' | 'sla') => void;
@@ -164,21 +164,21 @@ function PersonalView({ handleAskAI, onAskAICustom }: { handleAskAI: () => void;
 // ── Department View ─────────────────────────────────────────────
 
 function DepartmentView({
-  departments, reportFilter, reportDateRange, appliedTeamIds,
+  departments, reportFilter, reportDateRange,
   handleAskAI, reportContext, onAskAICustom,
-}: { departments: DepartmentOption[]; reportFilter: 'my' | number; reportDateRange: string; appliedTeamIds: number[]; handleAskAI: () => void; reportContext: string; onAskAICustom: (p: string) => void }) {
+}: { departments: DepartmentOption[]; reportFilter: 'my' | string; reportDateRange: string; handleAskAI: () => void; reportContext: string; onAskAICustom: (p: string) => void }) {
   const [topTopics, setTopTopics] = useState<{ topicName: string; ticketCount: number }[]>([]);
   const [slaData, setSlaData] = useState<{ departmentName: string; slaAchievementRate: number }[]>([]);
   const [localStats, setLocalStats] = useState<TicketCountStatsDto | null>(null);
   const [dashLoading, setDashLoading] = useState(false);
 
-  const deptIds = [reportFilter as number];
-  const deptName = departments.find(d => d.id === reportFilter)?.name || 'department';
+  const deptIds = [reportFilter as string] as unknown as number[];
+  const deptName = departments.find(d => String(d.id) === String(reportFilter))?.name || 'department';
 
   useEffect(() => {
     let cancelled = false;
     setDashLoading(true);
-    const params = { departmentIds: deptIds, teamIds: appliedTeamIds.length ? appliedTeamIds : undefined, dateRange: reportDateRange as DateRangeKey };
+    const params = { departmentIds: deptIds, dateRange: reportDateRange as DateRangeKey };
     Promise.all([
       api.fetchTicketCountStatsFiltered(params).catch(() => null),
       api.fetchTopTopics(params).catch(() => []),
@@ -192,7 +192,7 @@ function DepartmentView({
     });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportFilter, reportDateRange, appliedTeamIds]);
+  }, [reportFilter, reportDateRange]);
 
   const topTopicMax = Math.max(...topTopics.map(t => t.ticketCount), 1);
   const avgSla = slaData.length > 0 ? Math.round(slaData.reduce((s, d) => s + d.slaAchievementRate, 0) / slaData.length) : 0;
@@ -244,53 +244,26 @@ function DepartmentView({
 
 export function ReportsDashboard(props: Props) {
   const isPersonal = props.reportFilter === 'my';
+  const deptSelectRef = useRef<HTMLSelectElement>(null);
+  const dateSelectRef = useRef<HTMLSelectElement>(null);
 
-  // Local pending state — nothing loads until user clicks Apply
-  const [pendingFilter, setPendingFilter] = useState<'my' | number>(props.reportFilter);
-  const [pendingDateRange, setPendingDateRange] = useState<'today' | 'week' | 'month' | '3months' | 'thisMonth' | '6months' | 'year'>(props.reportDateRange as 'today' | 'week' | 'month' | '3months' | 'thisMonth' | '6months' | 'year');
-  const [pendingTeamId, setPendingTeamId] = useState<number | null>(null);
-  const [appliedTeamIds, setAppliedTeamIds] = useState<number[]>([]);
-  const [teams, setTeams] = useState<{ id: number; name: string }[]>([]);
-  const pendingIsPersonal = pendingFilter === 'my';
-
-  // Sync pending state when props change externally
-  useEffect(() => { setPendingFilter(props.reportFilter); }, [props.reportFilter]);
-  useEffect(() => { setPendingDateRange(props.reportDateRange as typeof pendingDateRange); }, [props.reportDateRange]);
-
-  // Fetch teams when pending department changes
-  useEffect(() => {
-    if (pendingIsPersonal) { setTeams([]); return; }
-    const deptId = pendingFilter as number;
-    api.fetchTeams([deptId]).then(res => setTeams(res.records || [])).catch(() => setTeams([]));
-    setPendingTeamId(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingFilter, pendingIsPersonal]);
-
-  const pendingTeamIds = pendingTeamId ? [pendingTeamId] : [];
-  const isDirty = pendingFilter !== props.reportFilter
-    || pendingDateRange !== props.reportDateRange
-    || JSON.stringify(pendingTeamIds) !== JSON.stringify(appliedTeamIds);
-
-  const handleApply = () => {
-    if (pendingDateRange !== props.reportDateRange) {
-      props.setReportDateRange(pendingDateRange);
-    }
-    if (pendingFilter !== props.reportFilter) {
-      props.setReportFilter(pendingFilter);
-    }
-    setAppliedTeamIds(pendingTeamIds);
+  const handleGenerate = () => {
+    const deptVal = deptSelectRef.current?.value;
+    const dateVal = dateSelectRef.current?.value;
+    if (deptVal) props.setReportFilter(deptVal);
+    if (dateVal) props.setReportDateRange(dateVal as 'today' | 'week' | 'month' | '3months' | 'thisMonth' | '6months' | 'year');
   };
 
   return (
     <div className="space-y-6">
-      {/* Toggle: Personal Tickets vs Department + Date Range + Apply */}
+      {/* Toggle: Personal Tickets vs Department + Date Range + Generate */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center bg-black/5 dark:bg-white/5 rounded-full p-1">
           <button
-            onClick={() => setPendingFilter('my')}
+            onClick={() => props.setReportFilter('my')}
             className={cn(
               'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all',
-              pendingIsPersonal
+              isPersonal
                 ? 'bg-white dark:bg-white/10 text-foreground shadow-sm'
                 : 'text-foreground/60 hover:text-foreground'
             )}
@@ -299,14 +272,13 @@ export function ReportsDashboard(props: Props) {
           </button>
           <button
             onClick={() => {
-              if (props.departments.length > 0) {
-                const currentDeptId = typeof props.reportFilter === 'number' ? props.reportFilter : props.departments[0].id;
-                setPendingFilter(currentDeptId);
+              if (isPersonal && props.departments.length > 0) {
+                props.setReportFilter(String(props.departments[0].id));
               }
             }}
             className={cn(
               'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all',
-              !pendingIsPersonal
+              !isPersonal
                 ? 'bg-white dark:bg-white/10 text-foreground shadow-sm'
                 : 'text-foreground/60 hover:text-foreground'
             )}
@@ -314,49 +286,35 @@ export function ReportsDashboard(props: Props) {
             Department
           </button>
         </div>
-        {/* Department dropdown — only shown when not in personal mode */}
-        {!pendingIsPersonal && props.departments.length > 0 && (
+        {/* Department dropdown — uncontrolled */}
+        {!isPersonal && props.departments.length > 0 && (
           <select
-            value={String(pendingFilter)}
-            onChange={(e) => setPendingFilter(Number(e.target.value))}
+            ref={deptSelectRef}
+            defaultValue={String(props.reportFilter !== 'my' ? props.reportFilter : props.departments[0]?.id)}
             className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium"
           >
-            {props.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            {props.departments.map((d) => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
           </select>
         )}
-        {/* Date range — shown for department mode */}
-        {!pendingIsPersonal && (
+        {/* Date range — uncontrolled */}
+        {!isPersonal && (
           <select
-            value={pendingDateRange}
-            onChange={(e) => setPendingDateRange(e.target.value as typeof pendingDateRange)}
+            ref={dateSelectRef}
+            defaultValue={props.reportDateRange}
             className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium"
           >
             {DATE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         )}
-        {/* Team dropdown — shown for department mode when teams exist */}
-        {!pendingIsPersonal && teams.length > 0 && (
-          <select
-            value={pendingTeamId ?? ''}
-            onChange={(e) => setPendingTeamId(e.target.value ? Number(e.target.value) : null)}
-            className="h-8 text-[13px] bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-3 text-foreground outline-none font-medium"
+        {/* Generate */}
+        {!isPersonal && (
+          <button
+            onClick={handleGenerate}
+            className="h-8 px-4 rounded-lg text-[13px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all"
           >
-            <option value="">All Teams</option>
-            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+            Generate
+          </button>
         )}
-        <button
-          onClick={handleApply}
-          disabled={!isDirty}
-          className={cn(
-            'h-8 px-4 rounded-lg text-[13px] font-medium transition-all',
-            isDirty
-              ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
-              : 'bg-black/5 dark:bg-white/5 text-foreground/30 cursor-not-allowed'
-          )}
-        >
-          Apply
-        </button>
       </div>
       {isPersonal
         ? <PersonalView handleAskAI={() => props.handleAskAI()} onAskAICustom={props.onAskAICustom} />
@@ -364,7 +322,6 @@ export function ReportsDashboard(props: Props) {
             departments={props.departments}
             reportFilter={props.reportFilter}
             reportDateRange={props.reportDateRange}
-            appliedTeamIds={appliedTeamIds}
             handleAskAI={() => props.handleAskAI()}
             reportContext={props.reportContext}
             onAskAICustom={props.onAskAICustom}

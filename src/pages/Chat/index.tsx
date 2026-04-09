@@ -209,7 +209,7 @@ function WelcomeScreen() {
     { key: 'askQuestions', label: t('welcome.askQuestions'), onClick: () => navigate('/tickets') },
     { key: 'creativeTasks', label: t('welcome.creativeTasks'), onClick: () => {
       const { departments, setReportFilter } = useTicketsStore.getState();
-      if (departments.length > 0) setReportFilter(departments[0].id);
+      if (departments.length > 0) setReportFilter(String(departments[0].id));
       navigate('/tickets');
     }},
     { key: 'brainstorming', label: t('welcome.brainstorming'), onClick: () => sendMessage('What can you help me with? Give me a quick overview of your capabilities and some examples of things I can ask you to do.') },

@@ -29,7 +29,7 @@ interface TicketsState {
   departments: DepartmentOption[];
   selectedDepartmentId: number | null;
   scope: TicketScope;
-  reportFilter: 'my' | number; // 'my' = personal stats, number = department-wide stats
+  reportFilter: 'my' | string; // 'my' = personal stats, string = department ID (kept as string to preserve large IDs)
 
   // Dashboard
   stats: TicketCountStatsDto | null;
@@ -72,7 +72,7 @@ interface TicketsState {
   fetchTickets: (page?: number) => Promise<void>;
   setScope: (scope: TicketScope) => void;
   setSelectedDepartmentId: (id: number | null) => void;
-  setReportFilter: (filter: 'my' | number) => void;
+  setReportFilter: (filter: 'my' | string) => void;
   setReportDateRange: (range: 'today' | 'week' | 'month' | '3months' | 'thisMonth' | '6months' | 'year') => void;
   setReportGroupBy: (groupBy: number) => void;
   setReportType: (type: 'status' | 'activity' | 'sla') => void;
@@ -163,7 +163,7 @@ export const useTicketsStore = create<TicketsState>((set, get) => ({
         deptIds = userDepartmentIds.length > 0 ? userDepartmentIds : undefined;
       } else {
         // Department-wide stats — scope to the selected department only
-        deptIds = [reportFilter];
+        deptIds = [reportFilter] as unknown as number[];
       }
       const stats = await api.fetchTicketCountStats({ departmentIds: deptIds });
       set({ stats, statsLoading: false });
@@ -189,7 +189,7 @@ export const useTicketsStore = create<TicketsState>((set, get) => ({
         if (userDepartmentIds.length) deptIds = userDepartmentIds;
       } else {
         // Department-wide: use selected groupBy (default dept, or dept-staff for drill-down)
-        deptIds = [reportFilter];
+        deptIds = [reportFilter] as unknown as number[];
       }
 
       const [statusReport, activityReport] = await Promise.all([
